@@ -35,7 +35,6 @@ import com.github.nmorel.gwtjackson.client.ser.bean.AbstractBeanJsonSerializer;
 import com.github.nmorel.gwtjackson.client.ser.bean.AbstractIdentitySerializationInfo;
 import com.github.nmorel.gwtjackson.client.ser.bean.ObjectIdSerializer;
 import com.github.nmorel.gwtjackson.client.ser.bean.PropertyIdentitySerializationInfo;
-import com.github.nmorel.gwtjackson.rebind.PropertyInfo.AdditionalMethod;
 import com.github.nmorel.gwtjackson.rebind.type.JMapperType;
 import com.google.gwt.core.ext.GeneratorContext;
 import com.google.gwt.core.ext.TreeLogger;
@@ -46,7 +45,6 @@ import com.google.gwt.core.ext.typeinfo.JMethod;
 import com.google.gwt.core.ext.typeinfo.JParameter;
 import com.google.gwt.core.ext.typeinfo.JPrimitiveType;
 import com.google.gwt.core.ext.typeinfo.JType;
-import com.google.gwt.thirdparty.guava.common.base.Optional;
 import com.google.gwt.user.rebind.SourceWriter;
 
 import static com.github.nmorel.gwtjackson.rebind.CreatorUtils.QUOTED_FUNCTION;
@@ -397,8 +395,6 @@ public abstract class AbstractBeanJsonCreator extends AbstractCreator {
             source.println( "}" );
             source.println();
 
-            Optional<AdditionalMethod> additionalMethod = Optional.absent();
-
             source.println( "@Override" );
             source.println( "public %s<%s> getObjectId(%s bean, %s ctx) {", ObjectIdSerializer.class.getName(), qualifiedType, type
                 .getParameterizedQualifiedSourceName(), JSON_SERIALIZATION_CONTEXT_CLASS );
@@ -419,11 +415,6 @@ public abstract class AbstractBeanJsonCreator extends AbstractCreator {
 
             source.outdent();
             source.println( "}" );
-
-            if ( additionalMethod.isPresent() ) {
-                source.println();
-                additionalMethod.get().write( source );
-            }
 
             source.outdent();
             source.print( "}" );
@@ -457,7 +448,6 @@ public abstract class AbstractBeanJsonCreator extends AbstractCreator {
             source.println( "return %s;", getJsonDeserializerFromType( identityInfo.getType() ).getInstance() );
             source.outdent();
             source.println( "}" );
-            source.println();
 
             source.outdent();
             source.print( "}" );
