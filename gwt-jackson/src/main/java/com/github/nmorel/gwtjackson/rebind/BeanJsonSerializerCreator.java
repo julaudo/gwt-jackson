@@ -34,6 +34,8 @@ public class BeanJsonSerializerCreator extends AbstractBeanJsonCreator {
 
     private static final String BEAN_PROPERTY_SERIALIZER_CLASS = "com.github.nmorel.gwtjackson.client.ser.bean.BeanPropertySerializer";
 
+    private static final String JSON_SERIALIZER_PARAMETERS_CLASS = "com.github.nmorel.gwtjackson.client.JsonSerializerParameters";
+
     public BeanJsonSerializerCreator( TreeLogger logger, GeneratorContext context, RebindConfiguration configuration,
                                       JacksonTypeOracle typeOracle ) {
         super( logger, context, configuration, typeOracle );
