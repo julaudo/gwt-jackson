@@ -122,7 +122,7 @@ public class BeanJsonSerializerCreator extends AbstractBeanJsonCreator {
 
             JSerializerType serializerType;
             if ( property.isRawValue() ) {
-                serializerType = JSerializerType.builder().type( property.getType() ).instance( String
+                serializerType = new JSerializerType.Builder().type( property.getType() ).instance( String
                     .format( "ctx" + ".<%s>getRawValueJsonSerializer()", property.getType().getParameterizedQualifiedSourceName() ) )
                     .build();
             } else {

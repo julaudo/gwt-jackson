@@ -107,7 +107,7 @@ public abstract class AbstractCreator extends AbstractSourceCreator {
      *         </ul>
      */
     protected JSerializerType getJsonSerializerFromType( JType type ) throws UnableToCompleteException {
-        JSerializerType.Builder builder = JSerializerType.builder().type( type );
+        JSerializerType.Builder builder = new JSerializerType.Builder().type( type );
 
         JTypeParameter typeParameter = type.isTypeParameter();
         if ( null != typeParameter ) {
@@ -210,7 +210,7 @@ public abstract class AbstractCreator extends AbstractSourceCreator {
      * @return the code instantiating the {@link KeySerializer}.
      */
     protected JSerializerType getKeySerializerFromType( JType type ) throws UnableToCompleteException {
-        JSerializerType.Builder builder = JSerializerType.builder().type( type );
+        JSerializerType.Builder builder = new JSerializerType.Builder().type( type );
 
         Optional<MapperInstance> keySerializer = configuration.getKeySerializer( type );
         if ( keySerializer.isPresent() ) {
@@ -242,7 +242,7 @@ public abstract class AbstractCreator extends AbstractSourceCreator {
      *         </ul>
      */
     protected JDeserializerType getJsonDeserializerFromType( JType type ) throws UnableToCompleteException {
-        JDeserializerType.Builder builder = JDeserializerType.builder().type( type );
+        JDeserializerType.Builder builder = new JDeserializerType.Builder().type( type );
 
         JTypeParameter typeParameter = type.isTypeParameter();
         if ( null != typeParameter ) {
@@ -385,7 +385,7 @@ public abstract class AbstractCreator extends AbstractSourceCreator {
      * @return the code instantiating the {@link KeyDeserializer}.
      */
     protected JDeserializerType getKeyDeserializerFromType( JType type ) throws UnableToCompleteException {
-        JDeserializerType.Builder builder = JDeserializerType.builder();
+        JDeserializerType.Builder builder = new JDeserializerType.Builder();
         builder.type( type );
 
         Optional<MapperInstance> keyDeserializer = configuration.getKeyDeserializer( type );
