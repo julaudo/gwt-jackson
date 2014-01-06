@@ -22,6 +22,7 @@
 
   <inherits name="com.github.nmorel.gwtjackson.GwtJackson" />
   <inherits name="org.fusesource.restygwt.RestyGWT" />
+  <inherits name="name.pehl.piriti.json.JSON" />
 
   <entry-point class="com.github.nmorel.gwtjackson.benchmark.client.Benchmark" />
 

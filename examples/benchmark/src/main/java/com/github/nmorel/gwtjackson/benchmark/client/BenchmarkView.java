@@ -25,6 +25,7 @@ import com.github.nmorel.gwtjackson.benchmark.client.data.DataProvider;
 import com.github.nmorel.gwtjackson.benchmark.client.data.Person;
 import com.github.nmorel.gwtjackson.benchmark.client.mechanism.GwtJackson;
 import com.github.nmorel.gwtjackson.benchmark.client.mechanism.Mechanism;
+import com.github.nmorel.gwtjackson.benchmark.client.mechanism.Piriti;
 import com.github.nmorel.gwtjackson.benchmark.client.mechanism.RestyGwt;
 import com.github.nmorel.gwtjackson.benchmark.client.ui.InputCheckbox;
 import com.github.nmorel.gwtjackson.client.ObjectMapper;
@@ -82,7 +83,7 @@ public class BenchmarkView extends Composite implements Editor<Criteria> {
     private final CriteriaDriver driver;
 
     public BenchmarkView() {
-        mechanisms = Arrays.asList( new GwtJackson(), new RestyGwt() );
+        mechanisms = Arrays.asList( new GwtJackson(), new RestyGwt(), new Piriti() );
 
         initWidget( ourUiBinder.createAndBindUi( this ) );
 
