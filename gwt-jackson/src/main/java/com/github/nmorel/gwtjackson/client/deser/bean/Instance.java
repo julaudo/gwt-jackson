@@ -19,18 +19,24 @@ package com.github.nmorel.gwtjackson.client.deser.bean;
 import java.util.Map;
 
 /**
+ * This class is not thread safe. We re-use the same instance because we can't return two parameters without instantiating a class.
+ * This is to reduce the number of objects created.
+ *
  * @author Nicolas Morel
  */
 public class Instance<T> {
 
-    private final T instance;
+    private static final Instance INSTANCE = new Instance();
 
-    private final Map<String, String> bufferedProperties;
-
-    public Instance( T instance, Map<String, String> bufferedProperties ) {
-        this.instance = instance;
-        this.bufferedProperties = bufferedProperties;
+    public static <T> Instance<T> create( T instance, Map<String, String> bufferedProperties ) {
+        INSTANCE.instance = instance;
+        INSTANCE.bufferedProperties = bufferedProperties;
+        return INSTANCE;
     }
+
+    private T instance;
+
+    private Map<String, String> bufferedProperties;
 
     public T getInstance() {
         return instance;

@@ -241,7 +241,7 @@ public class BeanJsonDeserializerCreator extends AbstractBeanJsonCreator {
      * @param beanInfo info on bean
      */
     private void generateInstanceBuilderForDefaultConstructor( SourceWriter source, BeanInfo beanInfo ) {
-        source.println( "return new %s<%s>(create(), bufferedProperties);", INSTANCE_CLASS, beanInfo.getType()
+        source.println( "return %s.<%s>create(create(), bufferedProperties);", INSTANCE_CLASS, beanInfo.getType()
                 .getParameterizedQualifiedSourceName(), beanInfo.getType().getParameterizedQualifiedSourceName() );
     }
 
@@ -350,7 +350,7 @@ public class BeanJsonDeserializerCreator extends AbstractBeanJsonCreator {
         }
 
         String parameters = Joiner.on( ", " ).join( Collections2.transform( info.getCreatorParameters().keySet(), FORMAT_VARIABLE ) );
-        source.println( "return new %s<%s>( create(%s), bufferedProperties );", INSTANCE_CLASS, info.getType()
+        source.println( "return %s.<%s>create( create(%s), bufferedProperties );", INSTANCE_CLASS, info.getType()
                 .getParameterizedQualifiedSourceName(), parameters );
     }
 

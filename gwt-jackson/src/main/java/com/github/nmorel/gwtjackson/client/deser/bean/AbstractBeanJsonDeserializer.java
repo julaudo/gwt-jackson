@@ -167,7 +167,7 @@ public abstract class AbstractBeanJsonDeserializer<T> extends JsonDeserializer<T
 
             As include;
             if ( JsonToken.BEGIN_ARRAY.equals( token ) ) {
-                // in case of an enum subtype, we can have a wrapper array even if the user specified As.PROPERTY
+                // we can have a wrapper array even if the user specified As.PROPERTY in some cases (enum, creator delegation)
                 include = As.WRAPPER_ARRAY;
             } else {
                 include = typeInfo.getInclude();
@@ -274,11 +274,11 @@ public abstract class AbstractBeanJsonDeserializer<T> extends JsonDeserializer<T
         // we first instantiate the bean. It might buffer properties if there are properties required for constructor and they are not in
         // first position
         Instance<T> instance = instanceBuilder.newInstance( reader, ctx, bufferedProperties );
-
         T bean = instance.getInstance();
+        bufferedProperties = instance.getBufferedProperties();
 
         // we then look for identity. It can also buffer properties it is not in current reader position.
-        bufferedProperties = readIdentityProperty( identityInfo, bean, instance.getBufferedProperties(), reader, ctx, ignoredProperties );
+        bufferedProperties = readIdentityProperty( identityInfo, bean, bufferedProperties, reader, ctx, ignoredProperties );
 
         // we flush any buffered properties
         flushBufferedProperties( bean, bufferedProperties, requiredPropertiesLeft, ctx, ignoreUnknown, ignoredProperties );
