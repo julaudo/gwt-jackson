@@ -69,7 +69,7 @@
           <option name="SPACE_WITHIN_SWITCH_PARENTHESES" value="true" />
           <option name="SPACE_WITHIN_SYNCHRONIZED_PARENTHESES" value="true" />
           <option name="PREFER_PARAMETERS_WRAP" value="true" />
-          <option name="METHOD_CALL_CHAIN_WRAP" value="1" />
+          <option name="METHOD_CALL_CHAIN_WRAP" value="2" />
           <option name="KEEP_SIMPLE_METHODS_IN_ONE_LINE" value="true" />
           <option name="KEEP_SIMPLE_CLASSES_IN_ONE_LINE" value="true" />
           <option name="IF_BRACE_FORCE" value="3" />
@@ -94,4 +94,3 @@
     <option name="USE_PER_PROJECT_SETTINGS" value="true" />
   </component>
 </project>
-
