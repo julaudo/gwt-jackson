@@ -87,8 +87,8 @@ public class BeanJsonDeserializerCreator extends AbstractBeanJsonCreator {
     private static final String JSON_DESERIALIZER_PARAMETERS_CLASS = "com.github.nmorel.gwtjackson.client.JsonDeserializerParameters";
 
     public BeanJsonDeserializerCreator( TreeLogger logger, GeneratorContext context, RebindConfiguration configuration, JacksonTypeOracle
-            typeOracle ) {
-        super( logger, context, configuration, typeOracle );
+            typeOracle, JClassType beanType ) throws UnableToCompleteException {
+        super( logger, context, configuration, typeOracle, beanType );
     }
 
     @Override

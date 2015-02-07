@@ -55,8 +55,8 @@ public class BeanJsonSerializerCreator extends AbstractBeanJsonCreator {
     private static final String BEAN_PROPERTY_SERIALIZER_CLASS = "com.github.nmorel.gwtjackson.client.ser.bean.BeanPropertySerializer";
 
     public BeanJsonSerializerCreator( TreeLogger logger, GeneratorContext context, RebindConfiguration configuration, JacksonTypeOracle
-            typeOracle ) {
-        super( logger, context, configuration, typeOracle );
+            typeOracle, JClassType beanType ) throws UnableToCompleteException {
+        super( logger, context, configuration, typeOracle, beanType );
     }
 
     @Override

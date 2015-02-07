@@ -108,27 +108,19 @@ public abstract class AbstractBeanJsonCreator extends AbstractCreator {
 
     protected static final String JSON_SERIALIZER_PARAMETERS_CLASS = "com.github.nmorel.gwtjackson.client.JsonSerializerParameters";
 
-    protected BeanJsonMapperInfo mapperInfo;
+    protected final BeanJsonMapperInfo mapperInfo;
 
     public AbstractBeanJsonCreator( TreeLogger logger, GeneratorContext context, RebindConfiguration configuration, JacksonTypeOracle
-            typeOracle ) {
+            typeOracle, JClassType beanType ) throws UnableToCompleteException {
         super( logger, context, configuration, typeOracle );
+        this.mapperInfo = initMapperInfo( beanType );
     }
 
-    @Override
-    protected Optional<BeanJsonMapperInfo> getMapperInfo() {
-        return Optional.of( mapperInfo );
-    }
-
-    /**
-     * Creates an implementation of {@link AbstractBeanJsonSerializer} for the type given in
-     * parameter
-     *
-     * @param beanType type of the bean
-     *
-     * @return the fully qualified name of the created class
-     */
-    public BeanJsonMapperInfo create( JClassType beanType ) throws UnableToCompleteException, UnsupportedTypeException {
+    private BeanJsonMapperInfo initMapperInfo( JClassType beanType ) throws UnableToCompleteException {
+        BeanJsonMapperInfo mapperInfo = typeOracle.getBeanJsonMapperInfo( beanType );
+        if ( null != mapperInfo ) {
+            return mapperInfo;
+        }
 
         boolean samePackage = true;
         String packageName = beanType.getPackage().getName();
@@ -136,6 +128,12 @@ public abstract class AbstractBeanJsonCreator extends AbstractCreator {
             packageName = "gwtjackson." + packageName;
             samePackage = false;
         }
+
+        // retrieve the informations on the beans and its properties
+        BeanInfo beanInfo = BeanProcessor.processBean( logger, typeOracle, configuration, beanType );
+        PropertiesContainer properties = PropertyProcessor
+                .findAllProperties( configuration, logger, typeOracle, beanInfo, samePackage );
+        beanInfo = BeanProcessor.processProperties( configuration, logger, typeOracle, beanInfo, properties );
 
         // we concatenate the name of all the enclosing class
         StringBuilder builder = new StringBuilder( beanType.getSimpleSourceName() );
@@ -156,25 +154,30 @@ public abstract class AbstractBeanJsonCreator extends AbstractCreator {
         String simpleSerializerClassName = builder.toString() + "BeanJsonSerializerImpl";
         String simpleDeserializerClassName = builder.toString() + "BeanJsonDeserializerImpl";
 
-        mapperInfo = typeOracle.getBeanJsonMapperInfo( beanType );
+        mapperInfo = new BeanJsonMapperInfo( beanType, packageName, simpleSerializerClassName,
+                simpleDeserializerClassName, beanInfo, properties
+                .getProperties() );
 
-        if ( null == mapperInfo ) {
-            // retrieve the informations on the beans and its properties
-            BeanInfo beanInfo = BeanProcessor.processBean( logger, typeOracle, configuration, beanType );
+        typeOracle.addBeanJsonMapperInfo( beanType, mapperInfo );
 
-            PropertiesContainer properties = PropertyProcessor
-                    .findAllProperties( configuration, logger, typeOracle, beanInfo, samePackage );
+        return mapperInfo;
+    }
 
-            beanInfo = BeanProcessor.processProperties( configuration, logger, typeOracle, beanInfo, properties );
+    @Override
+    protected Optional<BeanJsonMapperInfo> getMapperInfo() {
+        return Optional.of( mapperInfo );
+    }
 
-            mapperInfo = new BeanJsonMapperInfo( beanType, packageName, simpleSerializerClassName,
-                    simpleDeserializerClassName, beanInfo, properties
-                    .getProperties() );
+    /**
+     * Creates an implementation of {@link AbstractBeanJsonSerializer} for the type given in
+     * parameter
+     *
+     * @return the information about the created class
+     */
+    public BeanJsonMapperInfo create() throws UnableToCompleteException, UnsupportedTypeException {
 
-            typeOracle.addBeanJsonMapperInfo( beanType, mapperInfo );
-        }
-
-        PrintWriter printWriter = getPrintWriter( packageName, isSerializer() ? simpleSerializerClassName : simpleDeserializerClassName );
+        PrintWriter printWriter = getPrintWriter( mapperInfo.getPackageName(), isSerializer() ? mapperInfo
+                .getSimpleSerializerClassName() : mapperInfo.getSimpleDeserializerClassName() );
         // the class already exists, no need to continue
         if ( printWriter == null ) {
             return mapperInfo;
@@ -189,21 +192,23 @@ public abstract class AbstractBeanJsonCreator extends AbstractCreator {
                 } else {
                     superclass = ABSTRACT_BEAN_JSON_SERIALIZER_CLASS;
                 }
-                superclass = superclass + "<" + beanType.getParameterizedQualifiedSourceName() + ">";
+                superclass = superclass + "<" + mapperInfo.getType().getParameterizedQualifiedSourceName() + ">";
             } else {
-                if ( isObject( beanType ) ) {
+                if ( isObject( mapperInfo.getType() ) ) {
                     superclass = AbstractObjectBeanJsonDeserializer.class.getCanonicalName();
-                } else if ( isSerializable( beanType ) ) {
+                } else if ( isSerializable( mapperInfo.getType() ) ) {
                     superclass = AbstractSerializableBeanJsonDeserializer.class.getCanonicalName();
                 } else if ( mapperInfo.getBeanInfo().isCreatorDelegation() ) {
-                    superclass = AbstractDelegationBeanJsonDeserializer.class.getCanonicalName() + "<" + beanType
+                    superclass = AbstractDelegationBeanJsonDeserializer.class.getCanonicalName() + "<" + mapperInfo.getType()
                             .getParameterizedQualifiedSourceName() + ">";
                 } else {
-                    superclass = ABSTRACT_BEAN_JSON_DESERIALIZER_CLASS + "<" + beanType.getParameterizedQualifiedSourceName() + ">";
+                    superclass = ABSTRACT_BEAN_JSON_DESERIALIZER_CLASS + "<" + mapperInfo.getType()
+                            .getParameterizedQualifiedSourceName() + ">";
                 }
             }
 
-            SourceWriter source = getSourceWriter( printWriter, packageName, getSimpleClassName() + getGenericClassBoundedParameters(),
+            SourceWriter source = getSourceWriter( printWriter, mapperInfo
+                            .getPackageName(), getSimpleClassName() + getGenericClassBoundedParameters(),
                     superclass );
 
             writeClassBody( source, mapperInfo.getBeanInfo(), mapperInfo.getProperties() );

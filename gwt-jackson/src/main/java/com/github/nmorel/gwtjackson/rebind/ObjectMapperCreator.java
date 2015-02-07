@@ -69,7 +69,7 @@ public class ObjectMapperCreator extends AbstractCreator {
     }
 
     /**
-     * Creates the implementation of the interface denoted by typeName and extending {@link ObjectMapper}
+     * Creates the implementation of the interface denoted by interfaceClass and extending {@link ObjectMapper}
      *
      * @param interfaceClass the interface to generate an implementation
      *

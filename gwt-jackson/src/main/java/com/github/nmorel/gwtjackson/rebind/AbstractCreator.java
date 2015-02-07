@@ -258,8 +258,8 @@ public abstract class AbstractCreator extends AbstractSourceCreator {
 
             BeanJsonSerializerCreator beanJsonSerializerCreator = new BeanJsonSerializerCreator( logger
                     .branch( Type.DEBUG, "Creating serializer for " + baseClassType
-                            .getQualifiedSourceName() ), context, configuration, typeOracle );
-            BeanJsonMapperInfo mapperInfo = beanJsonSerializerCreator.create( baseClassType );
+                            .getQualifiedSourceName() ), context, configuration, typeOracle, baseClassType );
+            BeanJsonMapperInfo mapperInfo = beanJsonSerializerCreator.create();
 
             ImmutableList<? extends JType> typeParameters = getTypeParameters( classType, subtype );
             ImmutableList.Builder<JSerializerType> parametersSerializerBuilder = ImmutableList.builder();
@@ -486,8 +486,8 @@ public abstract class AbstractCreator extends AbstractSourceCreator {
 
             BeanJsonDeserializerCreator beanJsonDeserializerCreator = new BeanJsonDeserializerCreator( logger
                     .branch( Type.DEBUG, "Creating deserializer for " + baseClassType
-                            .getQualifiedSourceName() ), context, configuration, typeOracle );
-            BeanJsonMapperInfo mapperInfo = beanJsonDeserializerCreator.create( baseClassType );
+                            .getQualifiedSourceName() ), context, configuration, typeOracle, baseClassType );
+            BeanJsonMapperInfo mapperInfo = beanJsonDeserializerCreator.create();
 
             ImmutableList<? extends JType> typeParameters = getTypeParameters( classType, subtype );
             ImmutableList.Builder<JDeserializerType> parametersDeserializerBuilder = ImmutableList.builder();
