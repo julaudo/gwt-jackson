@@ -24,10 +24,14 @@ import com.google.gwt.core.ext.typeinfo.JClassType;
 import com.google.gwt.core.ext.typeinfo.JParameterizedType;
 import com.google.gwt.core.ext.typeinfo.JPrimitiveType;
 import com.google.gwt.core.ext.typeinfo.JType;
+import com.google.gwt.core.ext.typeinfo.JTypeParameter;
+import com.google.gwt.core.ext.typeinfo.JWildcardType;
 import com.squareup.javapoet.ArrayTypeName;
 import com.squareup.javapoet.ClassName;
 import com.squareup.javapoet.ParameterizedTypeName;
 import com.squareup.javapoet.TypeName;
+import com.squareup.javapoet.TypeVariableName;
+import com.squareup.javapoet.WildcardTypeName;
 
 /**
  * @author Nicolas Morel
@@ -41,6 +45,24 @@ public final class JClassName {
             return getPrimitiveName( type.isPrimitive() );
         } else if ( null != type.isParameterized() ) {
             return getParameterizedTypeName( type.isParameterized() );
+        } else if ( null != type.isArray() ) {
+            return getArrayTypeName( type.isArray() );
+        } else if ( null != type.isTypeParameter() ) {
+            return getTypeVariableName( type.isTypeParameter() );
+        } else if ( null != type.isWildcard() ) {
+            return getWildcardTypeName( type.isWildcard() );
+        } else {
+            return getClassName( type.isClassOrInterface() );
+        }
+    }
+
+    public static TypeName getRaw( JType type ) {
+        if ( null != type.isPrimitive() ) {
+            return getPrimitiveName( type.isPrimitive() );
+        } else if ( null != type.isParameterized() ) {
+            return getClassName( type.isParameterized().getRawType() );
+        } else if ( null != type.isGenericType() ) {
+            return getClassName( type.isGenericType().getRawType() );
         } else if ( null != type.isArray() ) {
             return getArrayTypeName( type.isArray() );
         } else {
@@ -91,6 +113,19 @@ public final class JClassName {
 
     private static ArrayTypeName getArrayTypeName( JArrayType type ) {
         return ArrayTypeName.of( get( type.getComponentType() ) );
+    }
+
+    private static TypeVariableName getTypeVariableName( JTypeParameter type ) {
+        return TypeVariableName.get( type.getName(), get( type.getBounds() ) );
+    }
+
+    private static WildcardTypeName getWildcardTypeName( JWildcardType type ) {
+        switch ( type.getBoundType() ) {
+            case SUPER:
+                return WildcardTypeName.supertypeOf( get( type.getFirstBound() ) );
+            default:
+                return WildcardTypeName.subtypeOf( get( type.getFirstBound() ) );
+        }
     }
 
     private static ClassName getClassName( JClassType type ) {

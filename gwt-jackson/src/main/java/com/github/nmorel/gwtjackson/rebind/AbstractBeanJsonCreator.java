@@ -128,7 +128,7 @@ public abstract class AbstractBeanJsonCreator extends AbstractCreator {
      *
      * @return the fully qualified name of the created class
      */
-    public String create( JClassType beanType ) throws UnableToCompleteException, UnsupportedTypeException {
+    public BeanJsonMapperInfo create( JClassType beanType ) throws UnableToCompleteException, UnsupportedTypeException {
 
         boolean samePackage = true;
         String packageName = beanType.getPackage().getName();
@@ -146,43 +146,41 @@ public abstract class AbstractBeanJsonCreator extends AbstractCreator {
         }
 
         // if the type is specific to the mapper, we concatenate the name and hash of the mapper to it
-        if ( configuration.isSpecificToMapper( beanType ) ) {
+        boolean isSpecificToMapper = configuration.isSpecificToMapper( beanType );
+        if ( isSpecificToMapper ) {
             JClassType rootMapperClass = configuration.getRootMapperClass();
             builder.insert( 0, '_' ).insert( 0, configuration.getRootMapperHash() ).insert( 0, '_' ).insert( 0, rootMapperClass
                     .getSimpleSourceName() );
         }
 
         String simpleSerializerClassName = builder.toString() + "BeanJsonSerializerImpl";
-        String qualifiedSerializerClassName = packageName + "." + simpleSerializerClassName;
         String simpleDeserializerClassName = builder.toString() + "BeanJsonDeserializerImpl";
-        String qualifiedDeserializerClassName = packageName + "." + simpleDeserializerClassName;
 
-        String qualifiedClassName = isSerializer() ? qualifiedSerializerClassName : qualifiedDeserializerClassName;
+        mapperInfo = typeOracle.getBeanJsonMapperInfo( beanType );
+
+        if ( null == mapperInfo ) {
+            // retrieve the informations on the beans and its properties
+            BeanInfo beanInfo = BeanProcessor.processBean( logger, typeOracle, configuration, beanType );
+
+            PropertiesContainer properties = PropertyProcessor
+                    .findAllProperties( configuration, logger, typeOracle, beanInfo, samePackage );
+
+            beanInfo = BeanProcessor.processProperties( configuration, logger, typeOracle, beanInfo, properties );
+
+            mapperInfo = new BeanJsonMapperInfo( beanType, packageName, simpleSerializerClassName,
+                    simpleDeserializerClassName, beanInfo, properties
+                    .getProperties() );
+
+            typeOracle.addBeanJsonMapperInfo( beanType, mapperInfo );
+        }
 
         PrintWriter printWriter = getPrintWriter( packageName, isSerializer() ? simpleSerializerClassName : simpleDeserializerClassName );
         // the class already exists, no need to continue
         if ( printWriter == null ) {
-            return qualifiedClassName;
+            return mapperInfo;
         }
 
         try {
-            mapperInfo = typeOracle.getBeanJsonMapperInfo( beanType );
-
-            if ( null == mapperInfo ) {
-                // retrieve the informations on the beans and its properties
-                BeanInfo beanInfo = BeanProcessor.processBean( logger, typeOracle, configuration, beanType );
-
-                PropertiesContainer properties = PropertyProcessor
-                        .findAllProperties( configuration, logger, typeOracle, beanInfo, samePackage );
-
-                beanInfo = BeanProcessor.processProperties( configuration, logger, typeOracle, beanInfo, properties );
-
-                mapperInfo = new BeanJsonMapperInfo( beanType, qualifiedSerializerClassName, simpleSerializerClassName,
-                        qualifiedDeserializerClassName, simpleDeserializerClassName, beanInfo, properties
-                        .getProperties() );
-
-                typeOracle.addBeanJsonMapperInfo( beanType, mapperInfo );
-            }
 
             String superclass;
             if ( isSerializer() ) {
@@ -216,7 +214,7 @@ public abstract class AbstractBeanJsonCreator extends AbstractCreator {
             printWriter.close();
         }
 
-        return qualifiedClassName;
+        return mapperInfo;
     }
 
     protected abstract boolean isSerializer();

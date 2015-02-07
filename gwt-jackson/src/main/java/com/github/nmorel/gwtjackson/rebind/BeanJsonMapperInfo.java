@@ -29,6 +29,8 @@ public class BeanJsonMapperInfo {
 
     private final JClassType type;
 
+    private final String packageName;
+
     private final String qualifiedSerializerClassName;
 
     private final String simpleSerializerClassName;
@@ -45,13 +47,13 @@ public class BeanJsonMapperInfo {
 
     private final ImmutableMap<String, PropertyInfo> properties;
 
-    public BeanJsonMapperInfo( JClassType type, String qualifiedSerializerClassName, String simpleSerializerClassName, String
-            qualifiedDeserializerClassName, String simpleDeserializerClassName, BeanInfo beanInfo, ImmutableMap<String, PropertyInfo>
+    public BeanJsonMapperInfo( JClassType type, String packageName, String simpleSerializerClassName, String simpleDeserializerClassName, BeanInfo beanInfo, ImmutableMap<String, PropertyInfo>
             properties ) {
         this.type = type;
-        this.qualifiedSerializerClassName = qualifiedSerializerClassName;
+        this.packageName = packageName;
+        this.qualifiedSerializerClassName = packageName + "." + simpleSerializerClassName;
         this.simpleSerializerClassName = simpleSerializerClassName;
-        this.qualifiedDeserializerClassName = qualifiedDeserializerClassName;
+        this.qualifiedDeserializerClassName = packageName + "." + simpleDeserializerClassName;
         this.simpleDeserializerClassName = simpleDeserializerClassName;
         this.beanInfo = beanInfo;
         this.properties = properties;
@@ -95,6 +97,10 @@ public class BeanJsonMapperInfo {
 
     public JClassType getType() {
         return type;
+    }
+
+    public String getPackageName() {
+        return packageName;
     }
 
     public String getQualifiedSerializerClassName() {

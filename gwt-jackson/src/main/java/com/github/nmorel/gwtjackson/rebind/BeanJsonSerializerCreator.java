@@ -33,6 +33,7 @@ import com.github.nmorel.gwtjackson.rebind.bean.BeanInfo;
 import com.github.nmorel.gwtjackson.rebind.exception.UnsupportedTypeException;
 import com.github.nmorel.gwtjackson.rebind.property.PropertyInfo;
 import com.github.nmorel.gwtjackson.rebind.type.JSerializerType;
+import com.github.nmorel.gwtjackson.rebind.writer.JClassName;
 import com.google.gwt.core.ext.GeneratorContext;
 import com.google.gwt.core.ext.TreeLogger;
 import com.google.gwt.core.ext.TreeLogger.Type;
@@ -42,6 +43,7 @@ import com.google.gwt.thirdparty.guava.common.base.Optional;
 import com.google.gwt.thirdparty.guava.common.collect.ImmutableList;
 import com.google.gwt.thirdparty.guava.common.collect.ImmutableMap;
 import com.google.gwt.user.rebind.SourceWriter;
+import com.squareup.javapoet.CodeBlock;
 
 import static com.github.nmorel.gwtjackson.rebind.CreatorUtils.escapeString;
 
@@ -127,9 +129,9 @@ public class BeanJsonSerializerCreator extends AbstractBeanJsonCreator {
     private JSerializerType getJsonSerializerFromProperty( PropertyInfo propertyInfo ) throws UnableToCompleteException {
         if ( null != propertyInfo && propertyInfo.getGetterAccessor().isPresent() && !propertyInfo.isIgnored() ) {
             if ( propertyInfo.isRawValue() ) {
-                return new JSerializerType.Builder().type( propertyInfo.getType() ).instance( String
-                        .format( "%s.<%s>getInstance()", RawValueJsonSerializer.class.getCanonicalName(), propertyInfo.getType()
-                                .getParameterizedQualifiedSourceName() ) ).build();
+                return new JSerializerType.Builder().type( propertyInfo.getType() ).instance( CodeBlock.builder()
+                        .add( "$T.<$T>getInstance()", RawValueJsonSerializer.class, JClassName.get( propertyInfo.getType() ) ).build() )
+                        .build();
             } else {
                 try {
                     return getJsonSerializerFromType( propertyInfo.getType() );
