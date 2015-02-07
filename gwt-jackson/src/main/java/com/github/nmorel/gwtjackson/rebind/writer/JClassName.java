@@ -19,10 +19,12 @@ package com.github.nmorel.gwtjackson.rebind.writer;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.google.gwt.core.ext.typeinfo.JArrayType;
 import com.google.gwt.core.ext.typeinfo.JClassType;
 import com.google.gwt.core.ext.typeinfo.JParameterizedType;
 import com.google.gwt.core.ext.typeinfo.JPrimitiveType;
 import com.google.gwt.core.ext.typeinfo.JType;
+import com.squareup.javapoet.ArrayTypeName;
 import com.squareup.javapoet.ClassName;
 import com.squareup.javapoet.ParameterizedTypeName;
 import com.squareup.javapoet.TypeName;
@@ -39,6 +41,8 @@ public final class JClassName {
             return getPrimitiveName( type.isPrimitive() );
         } else if ( null != type.isParameterized() ) {
             return getParameterizedTypeName( type.isParameterized() );
+        } else if ( null != type.isArray() ) {
+            return getArrayTypeName( type.isArray() );
         } else {
             return getClassName( type.isClassOrInterface() );
         }
@@ -83,6 +87,10 @@ public final class JClassName {
 
     private static ParameterizedTypeName getParameterizedTypeName( JParameterizedType type ) {
         return ParameterizedTypeName.get( getClassName( type ), get( type.getTypeArgs() ) );
+    }
+
+    private static ArrayTypeName getArrayTypeName( JArrayType type ) {
+        return ArrayTypeName.of( get( type.getComponentType() ) );
     }
 
     private static ClassName getClassName( JClassType type ) {
