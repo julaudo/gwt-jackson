@@ -16,14 +16,17 @@
 
 package com.github.nmorel.gwtjackson.rebind.property.processor;
 
-import com.github.nmorel.gwtjackson.rebind.property.AdditionalMethod;
+import javax.lang.model.element.Modifier;
+
 import com.github.nmorel.gwtjackson.rebind.property.FieldAccessor;
+import com.github.nmorel.gwtjackson.rebind.writer.JClassName;
 import com.google.gwt.core.ext.typeinfo.JClassType;
 import com.google.gwt.core.ext.typeinfo.JField;
 import com.google.gwt.core.ext.typeinfo.JMethod;
 import com.google.gwt.core.ext.typeinfo.JType;
 import com.google.gwt.thirdparty.guava.common.base.Optional;
-import com.google.gwt.user.rebind.SourceWriter;
+import com.squareup.javapoet.CodeBlock;
+import com.squareup.javapoet.MethodSpec;
 
 /**
  * @author Nicolas Morel
@@ -42,75 +45,73 @@ final class FieldWriteAccessor extends FieldAccessor {
     }
 
     @Override
-    protected Accessor getAccessor( final String beanName, final boolean useMethod, final boolean useJsni ) {
-        // FIXME
-        return null;
-//        final JType[] fieldsType;
-//        final JClassType enclosingType;
-//        if ( useMethod ) {
-//            fieldsType = method.get().getParameterTypes();
-//            enclosingType = method.get().getEnclosingType();
-//        } else {
-//            fieldsType = new JType[]{field.get().getType()};
-//            enclosingType = field.get().getEnclosingType();
-//        }
-//
-//        String params = parametersToString( fieldsType, new Converter() {
-//            @Override
-//            public String convert( int index, JType type ) {
-//                return "%s";
-//            }
-//        } );
-//
-//        if ( !useJsni ) {
-//            if ( useMethod ) {
-//                return new Accessor( beanName + "." + method.get().getName() + "(" + params + ")" );
-//            } else {
-//                return new Accessor( beanName + "." + field.get().getName() + " = " + params );
-//            }
-//        }
-//
-//        // field/setter has not been detected or is private or is in a different package. We use JSNI to access private setter/field.
-//        final String methodName = "setValueWithJsni";
-//        String accessor = methodName + "(" + beanName + ", " + params + ")";
-//        AdditionalMethod additionalMethod = new AdditionalMethod() {
-//            @Override
-//            public void write( SourceWriter source ) {
-//                String paramsSignature = parametersToString( fieldsType, new Converter() {
-//                    @Override
-//                    public String convert( int index, JType type ) {
-//                        return type.getParameterizedQualifiedSourceName() + " value" + index;
-//                    }
-//                } );
-//
-//                String jni = parametersToString( fieldsType, new Converter() {
-//                    @Override
-//                    public String convert( int index, JType type ) {
-//                        return type.getJNISignature();
-//                    }
-//                } );
-//
-//                String values = parametersToString( fieldsType, new Converter() {
-//                    @Override
-//                    public String convert( int index, JType type ) {
-//                        return "value" + index;
-//                    }
-//                } );
-//
-//                source.println( "private native void %s(%s bean, %s) /*-{", methodName, enclosingType
-//                        .getParameterizedQualifiedSourceName(), paramsSignature );
-//                source.indent();
-//                if ( useMethod ) {
-//                    source.println( "bean.@%s::%s(%s)(%s);", enclosingType.getQualifiedSourceName(), method.get().getName(), jni, values );
-//                } else {
-//                    source.println( "bean.@%s::%s = %s;", enclosingType.getQualifiedSourceName(), field.get().getName(), values );
-//                }
-//                source.outdent();
-//                source.println( "}-*/;" );
-//            }
-//        };
-//
-//        return new Accessor( accessor, additionalMethod );
+    protected Accessor getAccessor( final String beanName, final boolean useMethod, final boolean useJsni, Object... obj ) {
+        final JType[] fieldsType;
+        final JClassType enclosingType;
+        if ( useMethod ) {
+            fieldsType = method.get().getParameterTypes();
+            enclosingType = method.get().getEnclosingType();
+        } else {
+            fieldsType = new JType[]{field.get().getType()};
+            enclosingType = field.get().getEnclosingType();
+        }
+
+        String params = parametersToString( fieldsType, new Converter() {
+            @Override
+            public String convert( int index, JType type ) {
+                return "$L";
+            }
+        } );
+
+        if ( !useJsni ) {
+            if ( useMethod ) {
+                return new Accessor( CodeBlock.builder().add( beanName + "." + method.get().getName() + "(" + params + ")", obj ).build() );
+            } else {
+                return new Accessor( CodeBlock.builder().add( beanName + "." + field.get().getName() + " = " + params, obj ).build() );
+            }
+        }
+
+        CodeBlock.Builder jsniCode = CodeBlock.builder()
+                .add( " /*-{\n" ).indent();
+
+        Converter typeToVariableName = new Converter() {
+            @Override
+            public String convert( int index, JType type ) {
+                return "value" + index;
+            }
+        };
+        String values = parametersToString( fieldsType, typeToVariableName );
+
+        if ( useMethod ) {
+            String jni = parametersToString( fieldsType, new Converter() {
+                @Override
+                public String convert( int index, JType type ) {
+                    return type.getJNISignature();
+                }
+            } );
+            jsniCode.addStatement( "bean.@$L::$L($L)($L)", enclosingType.getQualifiedSourceName(), method.get().getName(), jni, values );
+        } else {
+            jsniCode.addStatement( "bean.@$L::$L = $L", enclosingType.getQualifiedSourceName(), field.get().getName(), values );
+        }
+
+        jsniCode.unindent().add( "}-*/" );
+
+        MethodSpec.Builder additionalMethodBuilder = MethodSpec.methodBuilder( "setValueWithJsni" )
+                .addModifiers( Modifier.PRIVATE, Modifier.NATIVE )
+                .addParameter( JClassName.get( enclosingType ), "bean" )
+                .addCode( jsniCode.build() );
+        for ( int i = 0; i < fieldsType.length; i++ ) {
+            JType fieldType = fieldsType[i];
+            additionalMethodBuilder.addParameter( JClassName.get( fieldType ), typeToVariableName.convert( i, fieldType ) );
+        }
+        MethodSpec additionalMethod = additionalMethodBuilder.build();
+
+        CodeBlock accessor = CodeBlock.builder().add( "$N($L, $L)",
+                additionalMethod, beanName, CodeBlock.builder().add( params, obj )
+                        .build() )
+                .build();
+
+        return new Accessor( accessor, additionalMethod );
     }
 
     private String parametersToString( JType[] types, Converter converter ) {

@@ -110,7 +110,7 @@ public class BeanJsonSerializerCreator extends AbstractBeanJsonCreator {
 
         ImmutableList<JClassType> subtypes = filterSubtypes( beanInfo );
         if ( !subtypes.isEmpty() ) {
-            buildInitMapSubtypeClassToSerializerMethod( subtypes );
+            typeBuilder.addMethod( buildInitMapSubtypeClassToSerializerMethod( subtypes ) );
         }
     }
 
@@ -207,7 +207,6 @@ public class BeanJsonSerializerCreator extends AbstractBeanJsonCreator {
 
     private MethodSpec buildInitIdentityInfoMethod( Optional<JSerializerType> serializerType )
             throws UnableToCompleteException, UnsupportedTypeException {
-
         return MethodSpec.methodBuilder( "initIdentityInfo" )
                 .addModifiers( Modifier.PROTECTED )
                 .addAnnotation( Override.class )
@@ -251,8 +250,9 @@ public class BeanJsonSerializerCreator extends AbstractBeanJsonCreator {
 
             Class subtypeClass;
             TypeName serializerClass;
-            if ( configuration.getSerializer( subtype ).isPresent() || null != subtype.isEnum() || Enum.class.getName().equals( subtype
-                    .getQualifiedSourceName() ) ) {
+            if ( configuration.getSerializer( subtype ).isPresent()
+                    || null != subtype.isEnum()
+                    || Enum.class.getName().equals( subtype.getQualifiedSourceName() ) ) {
                 subtypeClass = DefaultSubtypeSerializer.class;
                 serializerClass = ParameterizedTypeName.get(
                         ClassName.get( JsonSerializer.class ), WildcardTypeName.subtypeOf( Object.class ) );
@@ -272,7 +272,7 @@ public class BeanJsonSerializerCreator extends AbstractBeanJsonCreator {
                                     .build()
                     ).build();
 
-            builder.addStatement( "map.put( $T.class, $L )", JClassName.getRaw( subtype ), subtypeType );
+            builder.addStatement( "map.put($T.class, $L)", JClassName.getRaw( subtype ), subtypeType );
         }
 
         builder.addStatement( "return map" );

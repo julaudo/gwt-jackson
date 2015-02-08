@@ -71,7 +71,6 @@ import com.google.gwt.thirdparty.guava.common.base.Optional;
 import com.google.gwt.thirdparty.guava.common.base.Strings;
 import com.google.gwt.thirdparty.guava.common.collect.ImmutableList;
 import com.google.gwt.thirdparty.guava.common.collect.ImmutableMap;
-import com.google.gwt.user.rebind.SourceWriter;
 import com.squareup.javapoet.ClassName;
 import com.squareup.javapoet.CodeBlock;
 import com.squareup.javapoet.FieldSpec;
@@ -89,12 +88,6 @@ import static com.github.nmorel.gwtjackson.rebind.CreatorUtils.isSerializable;
  * @author Nicolas Morel
  */
 public abstract class AbstractBeanJsonCreator extends AbstractCreator {
-
-    protected static final String ABSTRACT_BEAN_JSON_DESERIALIZER_CLASS = "com.github.nmorel.gwtjackson.client.deser.bean" + "" +
-            ".AbstractBeanJsonDeserializer";
-
-    protected static final String TYPE_DESERIALIZATION_INFO_CLASS = "com.github.nmorel.gwtjackson.client.deser.bean" + "" +
-            ".TypeDeserializationInfo";
 
     protected final BeanJsonMapperInfo mapperInfo;
 
@@ -352,44 +345,26 @@ public abstract class AbstractBeanJsonCreator extends AbstractCreator {
         return builder.build();
     }
 
-    protected Optional<JDeserializerType> getIdentityDeserializerType( BeanIdentityInfo identityInfo ) throws UnableToCompleteException,
-            UnsupportedTypeException {
-        if ( identityInfo.isIdABeanProperty() ) {
-            return Optional.absent();
-        } else {
-            return Optional.of( getJsonDeserializerFromType( identityInfo.getType().get() ) );
-        }
+    protected CodeBlock buildPropertyIdentifierDeserializationInfo( JClassType type, BeanIdentityInfo identityInfo ) {
+        return CodeBlock.builder().
+                add( "new $T($S, $T.class, $T.class)", JClassName.get( PropertyIdentityDeserializationInfo.class, type ),
+                        identityInfo.getPropertyName(), identityInfo.getGenerator(), identityInfo.getScope() )
+                .build();
     }
 
-    protected void generateIdentifierDeserializationInfo( SourceWriter source, JClassType type, BeanIdentityInfo identityInfo,
-                                                          Optional<JDeserializerType> deserializerType ) throws UnableToCompleteException {
-        if ( identityInfo.isIdABeanProperty() ) {
-
-            source.print( "new %s<%s>(\"%s\", %s.class, %s.class)", PropertyIdentityDeserializationInfo.class.getName(), type
-                    .getParameterizedQualifiedSourceName(), identityInfo.getPropertyName(), identityInfo.getGenerator()
-                    .getCanonicalName(), identityInfo.getScope().getCanonicalName() );
-
-        } else {
-
-            String qualifiedType = getParameterizedQualifiedClassName( identityInfo.getType().get() );
-
-            String identityPropertyClass = String.format( "%s<%s, %s>", AbstractIdentityDeserializationInfo.class.getName(), type
-                    .getParameterizedQualifiedSourceName(), qualifiedType );
-
-            source.println( "new %s(\"%s\", %s.class, %s.class) {", identityPropertyClass, identityInfo.getPropertyName(), identityInfo
-                    .getGenerator().getCanonicalName(), identityInfo.getScope().getCanonicalName() );
-            source.indent();
-
-            source.println( "@Override" );
-            source.println( "protected %s<?> newDeserializer() {", JSON_DESERIALIZER_CLASS );
-            source.indent();
-            source.println( "return %s;", deserializerType.get().getInstance() );
-            source.outdent();
-            source.println( "}" );
-
-            source.outdent();
-            source.print( "}" );
-        }
+    protected TypeSpec buildIdentifierDeserializationInfo( JClassType type, BeanIdentityInfo identityInfo,
+                                                           JDeserializerType deserializerType ) {
+        return TypeSpec.anonymousClassBuilder( "$S, $T.class, $T.class",
+                identityInfo.getPropertyName(), identityInfo.getGenerator(), identityInfo.getScope() )
+                .superclass( JClassName.get( AbstractIdentityDeserializationInfo.class, type, identityInfo.getType().get() ) )
+                .addMethod( MethodSpec.methodBuilder( "newDeserializer" )
+                                .addModifiers( Modifier.PROTECTED )
+                                .addAnnotation( Override.class )
+                                .returns( ParameterizedTypeName.get( ClassName.get( JsonDeserializer.class ), WildcardTypeName
+                                        .subtypeOf( Object.class ) ) )
+                                .addStatement( "return $L", deserializerType.getInstance() )
+                                .build()
+                ).build();
     }
 
     protected CodeBlock generateTypeInfo( BeanTypeInfo typeInfo, boolean serialization ) {
@@ -434,7 +409,7 @@ public abstract class AbstractBeanJsonCreator extends AbstractCreator {
         return findFirstTypeToApplyPropertyAnnotation( subLevel );
     }
 
-    protected void generateCommonPropertyParameters( CodeBlock.Builder paramBuilder, PropertyInfo property ) {
+    protected void buildCommonPropertyParameters( CodeBlock.Builder paramBuilder, PropertyInfo property ) {
         if ( property.getFormat().isPresent() ) {
             JsonFormat format = property.getFormat().get();
 
@@ -523,7 +498,7 @@ public abstract class AbstractBeanJsonCreator extends AbstractCreator {
                 .indent()
                 .indent();
 
-        generateCommonPropertyParameters( paramBuilder, property );
+        buildCommonPropertyParameters( paramBuilder, property );
 
         if ( property.getFormat().isPresent() ) {
             JsonFormat format = property.getFormat().get();

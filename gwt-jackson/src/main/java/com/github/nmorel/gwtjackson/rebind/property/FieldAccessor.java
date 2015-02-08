@@ -95,7 +95,7 @@ public abstract class FieldAccessor {
         return method;
     }
 
-    public Accessor getAccessor( final String beanName ) {
+    public Accessor getAccessor( final String beanName, Object... params ) {
         final boolean useJsni;
         if ( useMethod ) {
             useJsni = method.get().isPrivate() || (!samePackage && !method.get().isPublic());
@@ -104,8 +104,8 @@ public abstract class FieldAccessor {
         else {
             useJsni = field.get().isPrivate() || (!samePackage && !field.get().isPublic());
         }
-        return getAccessor( beanName, useMethod, useJsni );
+        return getAccessor( beanName, useMethod, useJsni, params );
     }
 
-    protected abstract Accessor getAccessor( final String beanName, final boolean useMethod, final boolean useJsni );
+    protected abstract Accessor getAccessor( final String beanName, final boolean useMethod, final boolean useJsni, Object... params );
 }

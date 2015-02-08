@@ -39,7 +39,7 @@ final class FieldReadAccessor extends FieldAccessor {
     }
 
     @Override
-    protected Accessor getAccessor( final String beanName, final boolean useMethod, final boolean useJsni ) {
+    protected Accessor getAccessor( final String beanName, final boolean useMethod, final boolean useJsni, Object... params ) {
         if ( !useJsni ) {
             if ( useMethod ) {
                 return new Accessor( CodeBlock.builder().add( beanName + "." + method.get().getName() + "()" ).build() );

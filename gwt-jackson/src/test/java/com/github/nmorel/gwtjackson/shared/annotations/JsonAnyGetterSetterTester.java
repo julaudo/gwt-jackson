@@ -59,6 +59,7 @@ public final class JsonAnyGetterSetterTester extends AbstractTester {
             this.anInt = anInt;
         }
 
+        // FIXME test with private
         @JsonAnyGetter
         public Map other() {
             Map map = new LinkedHashMap();
@@ -67,6 +68,7 @@ public final class JsonAnyGetterSetterTester extends AbstractTester {
             return map;
         }
 
+        // FIXME test with private
         @JsonAnySetter
         public void other( String property, Object value ) {
             if ( "notVisibleDouble".equals( property ) ) {
