@@ -16,6 +16,7 @@
 
 package com.github.nmorel.gwtjackson.rebind;
 
+import javax.annotation.Nullable;
 import javax.lang.model.element.Modifier;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -62,6 +63,7 @@ import com.google.gwt.core.ext.typeinfo.JAbstractMethod;
 import com.google.gwt.core.ext.typeinfo.JClassType;
 import com.google.gwt.core.ext.typeinfo.JParameter;
 import com.google.gwt.core.ext.typeinfo.JType;
+import com.google.gwt.thirdparty.guava.common.base.Function;
 import com.google.gwt.thirdparty.guava.common.base.Joiner;
 import com.google.gwt.thirdparty.guava.common.base.Optional;
 import com.google.gwt.thirdparty.guava.common.collect.Collections2;
@@ -75,6 +77,8 @@ import com.squareup.javapoet.ParameterizedTypeName;
 import com.squareup.javapoet.TypeName;
 import com.squareup.javapoet.TypeSpec;
 import com.squareup.javapoet.WildcardTypeName;
+
+import static com.github.nmorel.gwtjackson.rebind.CreatorUtils.getDefaultValueForType;
 
 /**
  * @author Nicolas Morel
@@ -231,104 +235,102 @@ public class BeanJsonDeserializerCreator extends AbstractBeanJsonCreator {
             propertyNameToVariableBuilder.put( name, variableName );
             PropertyInfo propertyInfo = properties.get( name );
 
-            source.println( "%s %s = %s; // %s", propertyInfo.getType()
-                            .getParameterizedQualifiedSourceName(), variableName, getDefaultValueForType( propertyInfo.getType() ),
-                    name );
+            newInstanceMethodBuilder.addCode( "$T $L = $L; // $L\n",
+                    JClassName.get( propertyInfo.getType() ), variableName, getDefaultValueForType( propertyInfo.getType() ), name );
 
             if ( propertyInfo.isRequired() ) {
                 requiredProperties.add( name );
             }
         }
-
+        newInstanceMethodBuilder.addCode( "\n" );
         ImmutableMap<String, String> propertyNameToVariable = propertyNameToVariableBuilder.build();
 
-        source.println();
-
-        source.println( "int nbParamToFind = %d;", beanInfo.getCreatorParameters().size() );
+        newInstanceMethodBuilder.addStatement( "int nbParamToFind = $L", beanInfo.getCreatorParameters().size() );
 
         if ( !requiredProperties.isEmpty() ) {
-            String requiredList = Joiner.on( ", " ).join( Collections2.transform( requiredProperties, QUOTED_FUNCTION ) );
-            source.println( "%s<String> requiredProperties = new %s<String>(%s.asList(%s));", Set.class.getName(), HashSet.class
-                    .getName(), Arrays.class.getName(), requiredList );
+            CodeBlock code = CodeBlock.builder()
+                    .add( Joiner.on( ", " ).join( Collections2.transform( requiredProperties, new Function<String, Object>() {
+                        @Nullable
+                        @Override
+                        public Object apply( String s ) {
+                            return "$S";
+                        }
+                    } ) ), requiredProperties.toArray() ).build();
+
+            newInstanceMethodBuilder.addStatement( "$T requiredProperties = new $T($T.asList($L))",
+                    ParameterizedTypeName.get( Set.class, String.class ),
+                    ParameterizedTypeName.get( HashSet.class, String.class ),
+                    Arrays.class, code );
         }
 
-        source.println();
+        newInstanceMethodBuilder.addCode( "\n" );
 
-        source.println( "if(null != bufferedProperties) {" );
-        source.indent();
-        source.println( "String value;" );
+        newInstanceMethodBuilder.beginControlFlow( "if(null != bufferedProperties)" );
+        newInstanceMethodBuilder.addStatement( "String value" );
         for ( String name : beanInfo.getCreatorParameters().keySet() ) {
             String variableName = propertyNameToVariable.get( name );
             PropertyInfo propertyInfo = properties.get( name );
 
-            source.println();
-            source.println( "value = bufferedProperties.remove(\"%s\");", name );
-            source.println( "if(null != value) {" );
-            source.indent();
-            source.println( "%s = %s%s.deserialize(ctx.newJsonReader(value), ctx);", variableName,
-                    INSTANCE_BUILDER_DESERIALIZER_PREFIX,
-                    variableName );
-            source.println( "nbParamToFind--;" );
+            newInstanceMethodBuilder.addCode( "\n" );
+            newInstanceMethodBuilder.addStatement( "value = bufferedProperties.remove($S)", name );
+            newInstanceMethodBuilder.beginControlFlow( "if(null != value)" );
+            newInstanceMethodBuilder.addStatement( "$L = $L.deserialize(ctx.newJsonReader(value), ctx);",
+                    variableName, INSTANCE_BUILDER_DESERIALIZER_PREFIX + variableName );
+            newInstanceMethodBuilder.addStatement( "nbParamToFind--" );
             if ( propertyInfo.isRequired() ) {
-                source.println( "requiredProperties.remove(\"%s\");", name );
+                newInstanceMethodBuilder.addStatement( "requiredProperties.remove($S)", name );
             }
-            source.outdent();
-            source.println( "}" );
+            newInstanceMethodBuilder.endControlFlow();
         }
-        source.outdent();
-        source.println( "}" );
+        newInstanceMethodBuilder.endControlFlow();
 
-        source.println();
+        newInstanceMethodBuilder.addCode( "\n" );
 
-        source.println( "String name;" );
-        source.println( "while (nbParamToFind > 0 && %s.NAME == reader.peek()) {", JsonToken.class.getName() );
-        source.indent();
+        newInstanceMethodBuilder.addStatement( "String name" );
+        newInstanceMethodBuilder.beginControlFlow( "while (nbParamToFind > 0 && $T.NAME == reader.peek())", JsonToken.class );
 
-        source.println( "name = reader.nextName();" );
-        source.println();
+        newInstanceMethodBuilder.addStatement( "name = reader.nextName()" );
+        newInstanceMethodBuilder.addCode( "\n" );
 
         for ( String name : beanInfo.getCreatorParameters().keySet() ) {
             String variableName = propertyNameToVariable.get( name );
             PropertyInfo propertyInfo = properties.get( name );
 
-            source.println( "if(\"%s\".equals(name)) {", name );
-            source.indent();
-            source.println( "%s = %s%s.deserialize(reader, ctx);", variableName, INSTANCE_BUILDER_DESERIALIZER_PREFIX,
-                    variableName );
-            source.println( "nbParamToFind--;" );
+            newInstanceMethodBuilder.beginControlFlow( "if($S.equals(name))", name );
+            newInstanceMethodBuilder.addStatement( "$L = $L.deserialize(reader, ctx)",
+                    variableName, INSTANCE_BUILDER_DESERIALIZER_PREFIX + variableName );
+            newInstanceMethodBuilder.addStatement( "nbParamToFind--" );
             if ( propertyInfo.isRequired() ) {
-                source.println( "requiredProperties.remove(\"%s\");", name );
+                newInstanceMethodBuilder.addStatement( "requiredProperties.remove($S)", name );
             }
-            source.println( "continue;" );
-            source.outdent();
-            source.println( "}" );
+            newInstanceMethodBuilder.addStatement( "continue" );
+            newInstanceMethodBuilder.endControlFlow();
         }
 
-        source.println();
-        source.println( "if(null == bufferedProperties) {" );
-        source.indent();
-        source.println( "bufferedProperties = new %s<String, String>();", HashMap.class.getName() );
-        source.outdent();
-        source.println( "}" );
-        source.println( "bufferedProperties.put( name, reader.nextValue() );" );
+        newInstanceMethodBuilder.addCode( "\n" );
 
-        source.outdent();
-        source.println( "}" );
+        newInstanceMethodBuilder.beginControlFlow( "if(null == bufferedProperties)" );
+        newInstanceMethodBuilder.addStatement( "bufferedProperties = new $T()",
+                ParameterizedTypeName.get( HashMap.class, String.class, String.class ) );
+        newInstanceMethodBuilder.endControlFlow();
+        newInstanceMethodBuilder.addStatement( "bufferedProperties.put( name, reader.nextValue() )" );
 
-        source.println();
+        newInstanceMethodBuilder.endControlFlow();
+
+        newInstanceMethodBuilder.addCode( "\n" );
 
         if ( !requiredProperties.isEmpty() ) {
-            source.println( "if(!requiredProperties.isEmpty()) {" );
-            source.indent();
-            source.println( "throw ctx.traceError( \"Required properties are missing : \" + requiredProperties, reader );" );
-            source.outdent();
-            source.println( "}" );
-            source.println();
+            newInstanceMethodBuilder.beginControlFlow( "if(!requiredProperties.isEmpty()) {" );
+            newInstanceMethodBuilder
+                    .addStatement( "throw ctx.traceError( \"Required properties are missing : \" + requiredProperties, reader )" );
+            newInstanceMethodBuilder.endControlFlow();
+            newInstanceMethodBuilder.addCode( "\n" );
         }
 
-        String parameters = Joiner.on( ", " ).join( propertyNameToVariable.values() );
-        source.println( "return new %s<%s>( create(%s), bufferedProperties );", INSTANCE_CLASS, beanInfo.getType()
-                .getParameterizedQualifiedSourceName(), parameters );
+        newInstanceMethodBuilder.addStatement( "return new $T($N($L), bufferedProperties)",
+                JClassName.get( Instance.class, beanInfo.getType() ),
+                createMethod,
+                Joiner.on( ", " ).join( propertyNameToVariable.values() ) );
     }
 
     /**
