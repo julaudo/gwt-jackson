@@ -26,9 +26,9 @@ import com.squareup.javapoet.CodeBlock;
  *
  * @author Nicolas Morel
  */
-public class JDeserializerType extends JMapperType {
+public final class JDeserializerType extends JMapperType {
 
-    public static class Builder extends JMapperType.Builder<Builder, JDeserializerType> {
+    public static final class Builder extends JMapperType.Builder<Builder, JDeserializerType> {
 
         public JDeserializerType build() {
             Preconditions.checkNotNull( instance, "instance is mandatory" );
@@ -40,7 +40,7 @@ public class JDeserializerType extends JMapperType {
         }
     }
 
-    public JDeserializerType( boolean beanMapper, JType type, CodeBlock instance, ImmutableList<JDeserializerType> parameters ) {
+    private JDeserializerType( boolean beanMapper, JType type, CodeBlock instance, ImmutableList<JDeserializerType> parameters ) {
         super( beanMapper, type, instance, parameters );
     }
 }

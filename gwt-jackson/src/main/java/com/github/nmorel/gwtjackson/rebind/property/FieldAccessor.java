@@ -77,7 +77,7 @@ public abstract class FieldAccessor {
         this.field = field;
         this.method = method;
 
-        // We first test if we can use the setter
+        // We first test if we can use the method
         if ( method.isPresent() && (methodAutoDetect || !fieldAutoDetect || !field.isPresent()) ) {
             useMethod = true;
         }

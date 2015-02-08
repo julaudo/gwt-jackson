@@ -130,7 +130,7 @@ public abstract class AbstractBeanJsonCreator extends AbstractCreator {
     private TypeSpec buildClass( String simpleClassName ) throws UnableToCompleteException, UnsupportedTypeException {
 
         TypeSpec.Builder typeBuilder = TypeSpec.classBuilder( simpleClassName )
-                .addModifiers( Modifier.PUBLIC );
+                .addModifiers( Modifier.PUBLIC, Modifier.FINAL );
 
         // We add the superclass.
         if ( isSerializer() ) {

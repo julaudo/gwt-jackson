@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.github.nmorel.gwtjackson.rebind.property.processor;
+package com.github.nmorel.gwtjackson.rebind.property;
 
 import javax.lang.model.element.Modifier;
 

@@ -73,19 +73,19 @@ public abstract class JMapperType {
         this.parameters = parameters;
     }
 
-    public boolean isBeanMapper() {
+    public final boolean isBeanMapper() {
         return beanMapper;
     }
 
-    public JType getType() {
+    public final JType getType() {
         return type;
     }
 
-    public CodeBlock getInstance() {
+    public final CodeBlock getInstance() {
         return instance;
     }
 
-    public ImmutableList<? extends JMapperType> getParameters() {
+    public final ImmutableList<? extends JMapperType> getParameters() {
         return parameters;
     }
 }

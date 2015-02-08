@@ -513,12 +513,12 @@ public final class RebindConfiguration {
     }
 
     public boolean isTypeSupportedForSerialization( TreeLogger logger, JClassType classType ) {
-        return allSupportedSerializationClass.contains( classType ) || additionalSupportedTypes.isIncluded( logger, classType
-                .getQualifiedSourceName() );
+        return allSupportedSerializationClass.contains( classType )
+                || additionalSupportedTypes.isIncluded( logger, classType.getQualifiedSourceName() );
     }
 
     public boolean isTypeSupportedForDeserialization( TreeLogger logger, JClassType classType ) {
-        return allSupportedDeserializationClass.contains( classType ) || additionalSupportedTypes.isIncluded( logger, classType
-                .getQualifiedSourceName() );
+        return allSupportedDeserializationClass.contains( classType )
+                || additionalSupportedTypes.isIncluded( logger, classType.getQualifiedSourceName() );
     }
 }

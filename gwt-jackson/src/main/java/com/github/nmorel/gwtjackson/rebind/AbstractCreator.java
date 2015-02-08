@@ -41,7 +41,7 @@ import com.github.nmorel.gwtjackson.rebind.bean.BeanInfo;
 import com.github.nmorel.gwtjackson.rebind.bean.BeanProcessor;
 import com.github.nmorel.gwtjackson.rebind.exception.UnsupportedTypeException;
 import com.github.nmorel.gwtjackson.rebind.property.PropertiesContainer;
-import com.github.nmorel.gwtjackson.rebind.property.processor.PropertyProcessor;
+import com.github.nmorel.gwtjackson.rebind.property.PropertyProcessor;
 import com.github.nmorel.gwtjackson.rebind.type.JDeserializerType;
 import com.github.nmorel.gwtjackson.rebind.type.JMapperType;
 import com.github.nmorel.gwtjackson.rebind.type.JSerializerType;
