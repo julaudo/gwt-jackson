@@ -601,7 +601,7 @@ public abstract class AbstractCreator extends AbstractSourceCreator {
     private CodeBlock methodCallCode( MapperInstance instance, ImmutableList<? extends JMapperType> parameters ) {
         CodeBlock.Builder builder = CodeBlock.builder();
         if ( null == instance.getInstanceCreationMethod().isConstructor() ) {
-            builder.add( "$T.$L", JClassName.get( instance.getMapperType() ), instance.getInstanceCreationMethod().getName() );
+            builder.add( "$T.$L", JClassName.getRaw( instance.getMapperType() ), instance.getInstanceCreationMethod().getName() );
         } else {
             builder.add( "new $T", JClassName.get( instance.getMapperType() ) );
         }
