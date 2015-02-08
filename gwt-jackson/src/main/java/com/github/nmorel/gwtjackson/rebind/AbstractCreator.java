@@ -102,7 +102,7 @@ public abstract class AbstractCreator extends AbstractSourceCreator {
      *
      * @return the {@link PrintWriter} or null if the class already exists.
      */
-    protected PrintWriter getPrintWriter( String packageName, String className ) {
+    protected final PrintWriter getPrintWriter( String packageName, String className ) {
         return context.tryCreate( logger, packageName, className );
     }
 
@@ -115,7 +115,7 @@ public abstract class AbstractCreator extends AbstractSourceCreator {
      *
      * @throws UnableToCompleteException if an exception is thrown by the writer
      */
-    protected void write( String packageName, TypeSpec type, PrintWriter printWriter ) throws UnableToCompleteException {
+    protected final void write( String packageName, TypeSpec type, PrintWriter printWriter ) throws UnableToCompleteException {
         try {
             JavaFile.builder( packageName, type )
                     .build()
@@ -135,7 +135,7 @@ public abstract class AbstractCreator extends AbstractSourceCreator {
      * @return the mapper information
      * @throws UnableToCompleteException if an exception occured while processing the type
      */
-    protected BeanJsonMapperInfo getMapperInfo( JClassType beanType ) throws UnableToCompleteException {
+    protected final BeanJsonMapperInfo getMapperInfo( JClassType beanType ) throws UnableToCompleteException {
         BeanJsonMapperInfo mapperInfo = typeOracle.getBeanJsonMapperInfo( beanType );
         if ( null != mapperInfo ) {
             return mapperInfo;
@@ -197,7 +197,7 @@ public abstract class AbstractCreator extends AbstractSourceCreator {
      * <li>new org.PersonBeanJsonSerializer()</li>
      * </ul>
      */
-    protected JSerializerType getJsonSerializerFromType( JType type ) throws UnableToCompleteException, UnsupportedTypeException {
+    protected final JSerializerType getJsonSerializerFromType( JType type ) throws UnableToCompleteException, UnsupportedTypeException {
         return getJsonSerializerFromType( type, false );
     }
 
@@ -214,7 +214,7 @@ public abstract class AbstractCreator extends AbstractSourceCreator {
      * <li>new org.PersonBeanJsonSerializer()</li>
      * </ul>
      */
-    protected JSerializerType getJsonSerializerFromType( JType type, boolean subtype )
+    protected final JSerializerType getJsonSerializerFromType( JType type, boolean subtype )
             throws UnableToCompleteException, UnsupportedTypeException {
 
         JSerializerType.Builder builder = new JSerializerType.Builder().type( type );
@@ -364,7 +364,7 @@ public abstract class AbstractCreator extends AbstractSourceCreator {
      *
      * @return the {@link JSerializerType}.
      */
-    protected JSerializerType getKeySerializerFromType( JType type ) throws UnsupportedTypeException {
+    protected final JSerializerType getKeySerializerFromType( JType type ) throws UnsupportedTypeException {
         JSerializerType.Builder builder = new JSerializerType.Builder().type( type );
         if ( null != type.isWildcard() ) {
             // For wildcard type, we use the base type to find the serializer.
@@ -411,7 +411,7 @@ public abstract class AbstractCreator extends AbstractSourceCreator {
      * <li>new org .PersonBeanJsonDeserializer()</li>
      * </ul>
      */
-    protected JDeserializerType getJsonDeserializerFromType( JType type ) throws UnableToCompleteException, UnsupportedTypeException {
+    protected final JDeserializerType getJsonDeserializerFromType( JType type ) throws UnableToCompleteException, UnsupportedTypeException {
         return getJsonDeserializerFromType( type, false );
     }
 
@@ -428,7 +428,7 @@ public abstract class AbstractCreator extends AbstractSourceCreator {
      * <li>new org .PersonBeanJsonDeserializer()</li>
      * </ul>
      */
-    protected JDeserializerType getJsonDeserializerFromType( JType type, boolean subtype ) throws UnableToCompleteException,
+    protected final JDeserializerType getJsonDeserializerFromType( JType type, boolean subtype ) throws UnableToCompleteException,
             UnsupportedTypeException {
         JDeserializerType.Builder builder = new JDeserializerType.Builder().type( type );
         if ( null != type.isWildcard() ) {
@@ -605,7 +605,7 @@ public abstract class AbstractCreator extends AbstractSourceCreator {
      *
      * @return the {@link JDeserializerType}.
      */
-    protected JDeserializerType getKeyDeserializerFromType( JType type ) throws UnsupportedTypeException {
+    protected final JDeserializerType getKeyDeserializerFromType( JType type ) throws UnsupportedTypeException {
         JDeserializerType.Builder builder = new JDeserializerType.Builder().type( type );
         if ( null != type.isWildcard() ) {
             // For wildcard type, we use the base type to find the deserializer.
