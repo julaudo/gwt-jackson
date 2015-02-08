@@ -20,6 +20,8 @@ import com.google.gwt.core.ext.typeinfo.JField;
 import com.google.gwt.core.ext.typeinfo.JMethod;
 import com.google.gwt.thirdparty.guava.common.base.Optional;
 import com.google.gwt.thirdparty.guava.common.base.Preconditions;
+import com.squareup.javapoet.CodeBlock;
+import com.squareup.javapoet.MethodSpec;
 
 /**
  * @author Nicolas Morel
@@ -28,17 +30,17 @@ public abstract class FieldAccessor {
 
     public static class Accessor {
 
-        private final String accessor;
+        private final CodeBlock accessor;
 
-        private final Optional<AdditionalMethod> additionalMethod;
+        private final Optional<MethodSpec> additionalMethod;
 
-        public Accessor( String accessor ) {
+        public Accessor( CodeBlock accessor ) {
             Preconditions.checkNotNull( accessor );
             this.accessor = accessor;
             this.additionalMethod = Optional.absent();
         }
 
-        public Accessor( String accessor, AdditionalMethod additionalMethod ) {
+        public Accessor( CodeBlock accessor, MethodSpec additionalMethod ) {
             Preconditions.checkNotNull( accessor );
             Preconditions.checkNotNull( additionalMethod );
 
@@ -46,11 +48,11 @@ public abstract class FieldAccessor {
             this.additionalMethod = Optional.of( additionalMethod );
         }
 
-        public String getAccessor() {
+        public CodeBlock getAccessor() {
             return accessor;
         }
 
-        public Optional<AdditionalMethod> getAdditionalMethod() {
+        public Optional<MethodSpec> getAdditionalMethod() {
             return additionalMethod;
         }
     }

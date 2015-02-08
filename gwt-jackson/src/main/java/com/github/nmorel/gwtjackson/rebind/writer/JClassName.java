@@ -41,8 +41,12 @@ public final class JClassName {
     private JClassName() {}
 
     public static TypeName get( JType type ) {
+        return get( false, type );
+    }
+
+    public static TypeName get( boolean boxed, JType type ) {
         if ( null != type.isPrimitive() ) {
-            return getPrimitiveName( type.isPrimitive() );
+            return getPrimitiveName( type.isPrimitive(), boxed );
         } else if ( null != type.isParameterized() ) {
             return getParameterizedTypeName( type.isParameterized() );
         } else if ( null != type.isArray() ) {
@@ -56,9 +60,13 @@ public final class JClassName {
         }
     }
 
+    public static ParameterizedTypeName get( Class clazz, JType... types ) {
+        return ParameterizedTypeName.get( ClassName.get( clazz ), get( true, types ) );
+    }
+
     public static TypeName getRaw( JType type ) {
         if ( null != type.isPrimitive() ) {
-            return getPrimitiveName( type.isPrimitive() );
+            return getPrimitiveName( type.isPrimitive(), false );
         } else if ( null != type.isParameterized() ) {
             return getClassName( type.isParameterized().getRawType() );
         } else if ( null != type.isGenericType() ) {
@@ -70,52 +78,49 @@ public final class JClassName {
         }
     }
 
-    public static TypeName[] get( JType[] types ) {
+    public static TypeName[] get( JType... types ) {
+        return get( false, types );
+    }
+
+    private static TypeName[] get( boolean boxed, JType... types ) {
         TypeName[] result = new TypeName[types.length];
         for ( int i = 0; i < types.length; i++ ) {
-            result[i] = get( types[i] );
+            result[i] = get( boxed, types[i] );
         }
         return result;
     }
 
-    private static TypeName getPrimitiveName( JPrimitiveType type ) {
+    private static TypeName getPrimitiveName( JPrimitiveType type, boolean boxed ) {
         if ( "boolean".equals( type.getSimpleSourceName() ) ) {
-            return TypeName.BOOLEAN;
-
+            return boxed ? ClassName.get( Boolean.class ) : TypeName.BOOLEAN;
         } else if ( "byte".equals( type.getSimpleSourceName() ) ) {
-            return TypeName.BYTE;
-
+            return boxed ? ClassName.get( Byte.class ) : TypeName.BYTE;
         } else if ( "short".equals( type.getSimpleSourceName() ) ) {
-            return TypeName.SHORT;
-
+            return boxed ? ClassName.get( Short.class ) : TypeName.SHORT;
         } else if ( "int".equals( type.getSimpleSourceName() ) ) {
-            return TypeName.INT;
-
+            return boxed ? ClassName.get( Integer.class ) : TypeName.INT;
         } else if ( "long".equals( type.getSimpleSourceName() ) ) {
-            return TypeName.LONG;
-
+            return boxed ? ClassName.get( Long.class ) : TypeName.LONG;
         } else if ( "char".equals( type.getSimpleSourceName() ) ) {
-            return TypeName.CHAR;
-
+            return boxed ? ClassName.get( Character.class ) : TypeName.CHAR;
         } else if ( "float".equals( type.getSimpleSourceName() ) ) {
-            return TypeName.FLOAT;
-
+            return boxed ? ClassName.get( Float.class ) : TypeName.FLOAT;
         } else if ( "double".equals( type.getSimpleSourceName() ) ) {
-            return TypeName.DOUBLE;
+            return boxed ? ClassName.get( Double.class ) : TypeName.DOUBLE;
         } else {
-            return TypeName.VOID;
+            return boxed ? ClassName.get( Void.class ) : TypeName.VOID;
         }
     }
 
     private static ParameterizedTypeName getParameterizedTypeName( JParameterizedType type ) {
-        return ParameterizedTypeName.get( getClassName( type ), get( type.getTypeArgs() ) );
+        return ParameterizedTypeName.get( getClassName( type ), get( true, type.getTypeArgs() ) );
     }
 
     private static ArrayTypeName getArrayTypeName( JArrayType type ) {
         return ArrayTypeName.of( get( type.getComponentType() ) );
     }
 
-    private static TypeVariableName getTypeVariableName( JTypeParameter type ) {
+    public static TypeVariableName getTypeVariableName( JTypeParameter type ) {
         return TypeVariableName.get( type.getName(), get( type.getBounds() ) );
     }
 

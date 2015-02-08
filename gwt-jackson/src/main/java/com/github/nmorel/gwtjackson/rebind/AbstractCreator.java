@@ -17,6 +17,7 @@
 package com.github.nmorel.gwtjackson.rebind;
 
 import javax.lang.model.element.Modifier;
+import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.Iterator;
 
@@ -57,10 +58,9 @@ import com.google.gwt.core.ext.typeinfo.JTypeParameter;
 import com.google.gwt.thirdparty.guava.common.base.Optional;
 import com.google.gwt.thirdparty.guava.common.collect.ImmutableList;
 import com.google.gwt.user.rebind.AbstractSourceCreator;
-import com.google.gwt.user.rebind.ClassSourceFileComposerFactory;
-import com.google.gwt.user.rebind.SourceWriter;
 import com.squareup.javapoet.ClassName;
 import com.squareup.javapoet.CodeBlock;
+import com.squareup.javapoet.JavaFile;
 import com.squareup.javapoet.MethodSpec;
 import com.squareup.javapoet.ParameterizedTypeName;
 import com.squareup.javapoet.TypeSpec;
@@ -102,16 +102,17 @@ public abstract class AbstractCreator extends AbstractSourceCreator {
         return context.tryCreate( logger, packageName, className );
     }
 
-    protected SourceWriter getSourceWriter( PrintWriter printWriter, String packageName, String className, String superClass, String...
-            interfaces ) {
-        ClassSourceFileComposerFactory composer = new ClassSourceFileComposerFactory( packageName, className );
-        if ( null != superClass ) {
-            composer.setSuperclass( superClass );
+    protected void write( String packageName, TypeSpec type, PrintWriter printWriter ) throws UnableToCompleteException {
+        try {
+            JavaFile.builder( packageName, type )
+                    .skipJavaLangImports( true )
+                    .build()
+                    .writeTo( printWriter );
+            context.commit( logger, printWriter );
+        } catch ( IOException e ) {
+            logger.log( TreeLogger.Type.ERROR, "Error writing the file " + packageName + "." + type.name, e );
+            throw new UnableToCompleteException();
         }
-        for ( String interfaceName : interfaces ) {
-            composer.addImplementedInterface( interfaceName );
-        }
-        return composer.createSourceWriter( context, printWriter );
     }
 
     protected abstract Optional<BeanJsonMapperInfo> getMapperInfo();

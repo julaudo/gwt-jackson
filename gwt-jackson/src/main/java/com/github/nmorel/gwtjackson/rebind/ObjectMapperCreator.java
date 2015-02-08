@@ -17,7 +17,6 @@
 package com.github.nmorel.gwtjackson.rebind;
 
 import javax.lang.model.element.Modifier;
-import java.io.IOException;
 import java.io.PrintWriter;
 
 import com.fasterxml.jackson.annotation.JsonRootName;
@@ -40,7 +39,6 @@ import com.google.gwt.core.ext.typeinfo.JParameterizedType;
 import com.google.gwt.thirdparty.guava.common.base.Optional;
 import com.google.gwt.thirdparty.guava.common.base.Strings;
 import com.squareup.javapoet.ClassName;
-import com.squareup.javapoet.JavaFile;
 import com.squareup.javapoet.MethodSpec;
 import com.squareup.javapoet.ParameterizedTypeName;
 import com.squareup.javapoet.TypeSpec;
@@ -126,16 +124,7 @@ public class ObjectMapperCreator extends AbstractCreator {
             mapperBuilder.addMethod( createSerializer( mappedTypeClass ) );
         }
 
-        try {
-            JavaFile.builder( packageName, mapperBuilder.build() )
-                    .skipJavaLangImports( true )
-                    .build()
-                    .writeTo( printWriter );
-            context.commit( logger, printWriter );
-        } catch ( IOException e ) {
-            logger.log( TreeLogger.Type.ERROR, "Error writing the file " + qualifiedMapperClassName, e );
-            throw new UnableToCompleteException();
-        }
+        write( packageName, mapperBuilder.build(), printWriter );
 
         return qualifiedMapperClassName;
     }

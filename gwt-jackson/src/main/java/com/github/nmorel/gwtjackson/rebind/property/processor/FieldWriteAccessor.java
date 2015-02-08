@@ -43,72 +43,74 @@ final class FieldWriteAccessor extends FieldAccessor {
 
     @Override
     protected Accessor getAccessor( final String beanName, final boolean useMethod, final boolean useJsni ) {
-        final JType[] fieldsType;
-        final JClassType enclosingType;
-        if ( useMethod ) {
-            fieldsType = method.get().getParameterTypes();
-            enclosingType = method.get().getEnclosingType();
-        } else {
-            fieldsType = new JType[]{field.get().getType()};
-            enclosingType = field.get().getEnclosingType();
-        }
-
-        String params = parametersToString( fieldsType, new Converter() {
-            @Override
-            public String convert( int index, JType type ) {
-                return "%s";
-            }
-        } );
-
-        if ( !useJsni ) {
-            if ( useMethod ) {
-                return new Accessor( beanName + "." + method.get().getName() + "(" + params + ")" );
-            } else {
-                return new Accessor( beanName + "." + field.get().getName() + " = " + params );
-            }
-        }
-
-        // field/setter has not been detected or is private or is in a different package. We use JSNI to access private setter/field.
-        final String methodName = "setValueWithJsni";
-        String accessor = methodName + "(" + beanName + ", " + params + ")";
-        AdditionalMethod additionalMethod = new AdditionalMethod() {
-            @Override
-            public void write( SourceWriter source ) {
-                String paramsSignature = parametersToString( fieldsType, new Converter() {
-                    @Override
-                    public String convert( int index, JType type ) {
-                        return type.getParameterizedQualifiedSourceName() + " value" + index;
-                    }
-                } );
-
-                String jni = parametersToString( fieldsType, new Converter() {
-                    @Override
-                    public String convert( int index, JType type ) {
-                        return type.getJNISignature();
-                    }
-                } );
-
-                String values = parametersToString( fieldsType, new Converter() {
-                    @Override
-                    public String convert( int index, JType type ) {
-                        return "value" + index;
-                    }
-                } );
-
-                source.println( "private native void %s(%s bean, %s) /*-{", methodName, enclosingType
-                        .getParameterizedQualifiedSourceName(), paramsSignature );
-                source.indent();
-                if ( useMethod ) {
-                    source.println( "bean.@%s::%s(%s)(%s);", enclosingType.getQualifiedSourceName(), method.get().getName(), jni, values );
-                } else {
-                    source.println( "bean.@%s::%s = %s;", enclosingType.getQualifiedSourceName(), field.get().getName(), values );
-                }
-                source.outdent();
-                source.println( "}-*/;" );
-            }
-        };
-
-        return new Accessor( accessor, additionalMethod );
+        // FIXME
+        return null;
+//        final JType[] fieldsType;
+//        final JClassType enclosingType;
+//        if ( useMethod ) {
+//            fieldsType = method.get().getParameterTypes();
+//            enclosingType = method.get().getEnclosingType();
+//        } else {
+//            fieldsType = new JType[]{field.get().getType()};
+//            enclosingType = field.get().getEnclosingType();
+//        }
+//
+//        String params = parametersToString( fieldsType, new Converter() {
+//            @Override
+//            public String convert( int index, JType type ) {
+//                return "%s";
+//            }
+//        } );
+//
+//        if ( !useJsni ) {
+//            if ( useMethod ) {
+//                return new Accessor( beanName + "." + method.get().getName() + "(" + params + ")" );
+//            } else {
+//                return new Accessor( beanName + "." + field.get().getName() + " = " + params );
+//            }
+//        }
+//
+//        // field/setter has not been detected or is private or is in a different package. We use JSNI to access private setter/field.
+//        final String methodName = "setValueWithJsni";
+//        String accessor = methodName + "(" + beanName + ", " + params + ")";
+//        AdditionalMethod additionalMethod = new AdditionalMethod() {
+//            @Override
+//            public void write( SourceWriter source ) {
+//                String paramsSignature = parametersToString( fieldsType, new Converter() {
+//                    @Override
+//                    public String convert( int index, JType type ) {
+//                        return type.getParameterizedQualifiedSourceName() + " value" + index;
+//                    }
+//                } );
+//
+//                String jni = parametersToString( fieldsType, new Converter() {
+//                    @Override
+//                    public String convert( int index, JType type ) {
+//                        return type.getJNISignature();
+//                    }
+//                } );
+//
+//                String values = parametersToString( fieldsType, new Converter() {
+//                    @Override
+//                    public String convert( int index, JType type ) {
+//                        return "value" + index;
+//                    }
+//                } );
+//
+//                source.println( "private native void %s(%s bean, %s) /*-{", methodName, enclosingType
+//                        .getParameterizedQualifiedSourceName(), paramsSignature );
+//                source.indent();
+//                if ( useMethod ) {
+//                    source.println( "bean.@%s::%s(%s)(%s);", enclosingType.getQualifiedSourceName(), method.get().getName(), jni, values );
+//                } else {
+//                    source.println( "bean.@%s::%s = %s;", enclosingType.getQualifiedSourceName(), field.get().getName(), values );
+//                }
+//                source.outdent();
+//                source.println( "}-*/;" );
+//            }
+//        };
+//
+//        return new Accessor( accessor, additionalMethod );
     }
 
     private String parametersToString( JType[] types, Converter converter ) {

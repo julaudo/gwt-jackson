@@ -31,6 +31,8 @@ public class BeanJsonMapperInfo {
 
     private final String packageName;
 
+    private final boolean samePackage;
+
     private final String qualifiedSerializerClassName;
 
     private final String simpleSerializerClassName;
@@ -47,10 +49,12 @@ public class BeanJsonMapperInfo {
 
     private final ImmutableMap<String, PropertyInfo> properties;
 
-    public BeanJsonMapperInfo( JClassType type, String packageName, String simpleSerializerClassName, String simpleDeserializerClassName, BeanInfo beanInfo, ImmutableMap<String, PropertyInfo>
+    public BeanJsonMapperInfo( JClassType type, String packageName, boolean samePackage, String simpleSerializerClassName, String
+            simpleDeserializerClassName, BeanInfo beanInfo, ImmutableMap<String, PropertyInfo>
             properties ) {
         this.type = type;
         this.packageName = packageName;
+        this.samePackage = samePackage;
         this.qualifiedSerializerClassName = packageName + "." + simpleSerializerClassName;
         this.simpleSerializerClassName = simpleSerializerClassName;
         this.qualifiedDeserializerClassName = packageName + "." + simpleDeserializerClassName;
@@ -101,6 +105,10 @@ public class BeanJsonMapperInfo {
 
     public String getPackageName() {
         return packageName;
+    }
+
+    public boolean isSamePackage() {
+        return samePackage;
     }
 
     public String getQualifiedSerializerClassName() {
