@@ -189,7 +189,7 @@
             <persistentunitcachedir>${project.build.directory}/gwt/cache</persistentunitcachedir>
             <mode>htmlunit</mode>
             <userAgents>gecko1_8</userAgents>
-            <testTimeOut>300</testTimeOut>
+            <testTimeOut>1000</testTimeOut>
           </configuration>
           <dependencies>
             <dependency>
