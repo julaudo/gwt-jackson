@@ -65,6 +65,15 @@ public final class CreatorUtils {
         return Optional.absent();
     }
 
+    /**
+     * Returns true when one of the type  has the specified annotation
+     *
+     * @param annotation the annotation
+     * @param hasAnnotationsList the types
+     * @param <T> Type of the annotation
+     *
+     * @return true if one the type has the annotation
+     */
     public static <T extends Annotation> boolean isAnnotationPresent( Class<T> annotation, List<? extends HasAnnotations>
             hasAnnotationsList ) {
         for ( HasAnnotations accessor : hasAnnotationsList ) {
@@ -75,6 +84,15 @@ public final class CreatorUtils {
         return false;
     }
 
+    /**
+     * Returns the first occurence of the annotation found on the types
+     *
+     * @param annotation the annotation
+     * @param hasAnnotationsList the types
+     * @param <T> Type of the annotation
+     *
+     * @return the first occurence of the annotation found on the types
+     */
     public static <T extends Annotation> Optional<T> getAnnotation( Class<T> annotation, List<? extends HasAnnotations>
             hasAnnotationsList ) {
         for ( HasAnnotations accessor : hasAnnotationsList ) {
@@ -140,8 +158,9 @@ public final class CreatorUtils {
         ImmutableList.Builder<JClassType> builder = ImmutableList.builder();
         if ( type.getSubtypes().length > 0 ) {
             for ( JClassType subtype : type.getSubtypes() ) {
-                if ( null == subtype.isAnnotation() && subtype.isPublic() && (!filterOnlySupportedType || configuration
-                        .isTypeSupportedForSerialization( logger, subtype )) ) {
+                if ( null == subtype.isAnnotation()
+                        && subtype.isPublic()
+                        && (!filterOnlySupportedType || configuration.isTypeSupportedForSerialization( logger, subtype )) ) {
                     builder.add( subtype );
                 }
             }
@@ -156,9 +175,10 @@ public final class CreatorUtils {
         ImmutableList.Builder<JClassType> builder = ImmutableList.builder();
         if ( type.getSubtypes().length > 0 ) {
             for ( JClassType subtype : type.getSubtypes() ) {
-                if ( (null == subtype.isInterface() && !subtype.isAbstract() && (!subtype.isMemberType() || subtype
-                        .isStatic())) && null == subtype.isAnnotation() && subtype.isPublic() && (!filterOnlySupportedType || configuration
-                        .isTypeSupportedForDeserialization( logger, subtype )) ) {
+                if ( (null == subtype.isInterface() && !subtype.isAbstract() && (!subtype.isMemberType() || subtype.isStatic()))
+                        && null == subtype.isAnnotation()
+                        && subtype.isPublic()
+                        && (!filterOnlySupportedType || configuration.isTypeSupportedForDeserialization( logger, subtype )) ) {
                     builder.add( subtype );
                 }
             }

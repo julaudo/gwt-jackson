@@ -19,7 +19,7 @@ package com.github.nmorel.gwtjackson.rebind.property.processor;
 import javax.lang.model.element.Modifier;
 
 import com.github.nmorel.gwtjackson.rebind.property.FieldAccessor;
-import com.github.nmorel.gwtjackson.rebind.writer.JClassName;
+import com.github.nmorel.gwtjackson.rebind.writer.JsniCodeBlockBuilder;
 import com.google.gwt.core.ext.typeinfo.JClassType;
 import com.google.gwt.core.ext.typeinfo.JField;
 import com.google.gwt.core.ext.typeinfo.JMethod;
@@ -27,6 +27,8 @@ import com.google.gwt.core.ext.typeinfo.JType;
 import com.google.gwt.thirdparty.guava.common.base.Optional;
 import com.squareup.javapoet.CodeBlock;
 import com.squareup.javapoet.MethodSpec;
+
+import static com.github.nmorel.gwtjackson.rebind.writer.JTypeName.typeName;
 
 /**
  * @author Nicolas Morel
@@ -59,19 +61,17 @@ final class FieldReadAccessor extends FieldAccessor {
             enclosingType = field.get().getEnclosingType();
         }
 
-        CodeBlock.Builder jsniCode = CodeBlock.builder()
-                .add( " /*-{\n" ).indent();
+        JsniCodeBlockBuilder jsniCode = JsniCodeBlockBuilder.builder();
         if ( useMethod ) {
             jsniCode.addStatement( "return bean.@$L::$L()()", enclosingType.getQualifiedSourceName(), method.get().getName() );
         } else {
             jsniCode.addStatement( "return bean.@$L::$L", enclosingType.getQualifiedSourceName(), field.get().getName() );
         }
-        jsniCode.unindent().add( "}-*/" );
 
         MethodSpec additionalMethod = MethodSpec.methodBuilder( "getValueWithJsni" )
                 .addModifiers( Modifier.PRIVATE, Modifier.NATIVE )
-                .returns( JClassName.get( fieldType ) )
-                .addParameter( JClassName.get( enclosingType ), "bean" )
+                .returns( typeName( fieldType ) )
+                .addParameter( typeName( enclosingType ), "bean" )
                 .addCode( jsniCode.build() )
                 .build();
 

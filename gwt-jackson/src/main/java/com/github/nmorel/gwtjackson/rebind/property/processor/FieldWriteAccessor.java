@@ -19,7 +19,7 @@ package com.github.nmorel.gwtjackson.rebind.property.processor;
 import javax.lang.model.element.Modifier;
 
 import com.github.nmorel.gwtjackson.rebind.property.FieldAccessor;
-import com.github.nmorel.gwtjackson.rebind.writer.JClassName;
+import com.github.nmorel.gwtjackson.rebind.writer.JsniCodeBlockBuilder;
 import com.google.gwt.core.ext.typeinfo.JClassType;
 import com.google.gwt.core.ext.typeinfo.JField;
 import com.google.gwt.core.ext.typeinfo.JMethod;
@@ -27,6 +27,8 @@ import com.google.gwt.core.ext.typeinfo.JType;
 import com.google.gwt.thirdparty.guava.common.base.Optional;
 import com.squareup.javapoet.CodeBlock;
 import com.squareup.javapoet.MethodSpec;
+
+import static com.github.nmorel.gwtjackson.rebind.writer.JTypeName.typeName;
 
 /**
  * @author Nicolas Morel
@@ -71,8 +73,7 @@ final class FieldWriteAccessor extends FieldAccessor {
             }
         }
 
-        CodeBlock.Builder jsniCode = CodeBlock.builder()
-                .add( " /*-{\n" ).indent();
+        JsniCodeBlockBuilder jsniCode = JsniCodeBlockBuilder.builder();
 
         Converter typeToVariableName = new Converter() {
             @Override
@@ -83,7 +84,7 @@ final class FieldWriteAccessor extends FieldAccessor {
         String values = parametersToString( fieldsType, typeToVariableName );
 
         if ( useMethod ) {
-            String jni = parametersToString( fieldsType, new Converter() {
+            String jni = parametersToString( fieldsType, null, new Converter() {
                 @Override
                 public String convert( int index, JType type ) {
                     return type.getJNISignature();
@@ -94,15 +95,13 @@ final class FieldWriteAccessor extends FieldAccessor {
             jsniCode.addStatement( "bean.@$L::$L = $L", enclosingType.getQualifiedSourceName(), field.get().getName(), values );
         }
 
-        jsniCode.unindent().add( "}-*/" );
-
         MethodSpec.Builder additionalMethodBuilder = MethodSpec.methodBuilder( "setValueWithJsni" )
                 .addModifiers( Modifier.PRIVATE, Modifier.NATIVE )
-                .addParameter( JClassName.get( enclosingType ), "bean" )
+                .addParameter( typeName( enclosingType ), "bean" )
                 .addCode( jsniCode.build() );
         for ( int i = 0; i < fieldsType.length; i++ ) {
             JType fieldType = fieldsType[i];
-            additionalMethodBuilder.addParameter( JClassName.get( fieldType ), typeToVariableName.convert( i, fieldType ) );
+            additionalMethodBuilder.addParameter( typeName( fieldType ), typeToVariableName.convert( i, fieldType ) );
         }
         MethodSpec additionalMethod = additionalMethodBuilder.build();
 
@@ -115,11 +114,15 @@ final class FieldWriteAccessor extends FieldAccessor {
     }
 
     private String parametersToString( JType[] types, Converter converter ) {
+        return parametersToString( types, ", ", converter );
+    }
+
+    private String parametersToString( JType[] types, String separator, Converter converter ) {
         StringBuilder builder = new StringBuilder();
 
         for ( int i = 0; i < types.length; i++ ) {
-            if ( i > 0 ) {
-                builder.append( ", " );
+            if ( i > 0 && null != separator ) {
+                builder.append( separator );
             }
             builder.append( converter.convert( i, types[i] ) );
         }

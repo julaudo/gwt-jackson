@@ -22,28 +22,40 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Map.Entry;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
+import com.fasterxml.jackson.annotation.JsonInclude.Include;
+import com.fasterxml.jackson.annotation.ObjectIdGenerator;
 import com.github.nmorel.gwtjackson.client.JsonSerializationContext;
 import com.github.nmorel.gwtjackson.client.JsonSerializer;
+import com.github.nmorel.gwtjackson.client.JsonSerializerParameters;
 import com.github.nmorel.gwtjackson.client.ser.RawValueJsonSerializer;
 import com.github.nmorel.gwtjackson.client.ser.bean.AbstractBeanJsonSerializer;
+import com.github.nmorel.gwtjackson.client.ser.bean.AbstractIdentitySerializationInfo;
 import com.github.nmorel.gwtjackson.client.ser.bean.AnyGetterPropertySerializer;
 import com.github.nmorel.gwtjackson.client.ser.bean.BeanPropertySerializer;
 import com.github.nmorel.gwtjackson.client.ser.bean.IdentitySerializationInfo;
+import com.github.nmorel.gwtjackson.client.ser.bean.ObjectIdSerializer;
+import com.github.nmorel.gwtjackson.client.ser.bean.PropertyIdentitySerializationInfo;
 import com.github.nmorel.gwtjackson.client.ser.bean.SubtypeSerializer;
 import com.github.nmorel.gwtjackson.client.ser.bean.SubtypeSerializer.BeanSubtypeSerializer;
 import com.github.nmorel.gwtjackson.client.ser.bean.SubtypeSerializer.DefaultSubtypeSerializer;
 import com.github.nmorel.gwtjackson.client.ser.bean.TypeSerializationInfo;
+import com.github.nmorel.gwtjackson.client.ser.map.MapJsonSerializer;
 import com.github.nmorel.gwtjackson.client.stream.JsonWriter;
+import com.github.nmorel.gwtjackson.rebind.bean.BeanIdentityInfo;
 import com.github.nmorel.gwtjackson.rebind.exception.UnsupportedTypeException;
+import com.github.nmorel.gwtjackson.rebind.property.FieldAccessor.Accessor;
 import com.github.nmorel.gwtjackson.rebind.property.PropertyInfo;
 import com.github.nmorel.gwtjackson.rebind.type.JSerializerType;
-import com.github.nmorel.gwtjackson.rebind.writer.JClassName;
 import com.google.gwt.core.ext.GeneratorContext;
 import com.google.gwt.core.ext.TreeLogger;
 import com.google.gwt.core.ext.TreeLogger.Type;
 import com.google.gwt.core.ext.UnableToCompleteException;
 import com.google.gwt.core.ext.typeinfo.JClassType;
+import com.google.gwt.core.ext.typeinfo.JType;
+import com.google.gwt.i18n.client.TimeZone;
 import com.google.gwt.thirdparty.guava.common.base.Optional;
+import com.google.gwt.thirdparty.guava.common.base.Strings;
 import com.google.gwt.thirdparty.guava.common.collect.ImmutableList;
 import com.squareup.javapoet.ArrayTypeName;
 import com.squareup.javapoet.ClassName;
@@ -52,9 +64,12 @@ import com.squareup.javapoet.MethodSpec;
 import com.squareup.javapoet.ParameterizedTypeName;
 import com.squareup.javapoet.TypeName;
 import com.squareup.javapoet.TypeSpec;
-import com.squareup.javapoet.WildcardTypeName;
 
 import static com.github.nmorel.gwtjackson.rebind.CreatorUtils.escapeString;
+import static com.github.nmorel.gwtjackson.rebind.writer.JTypeName.DEFAULT_WILDCARD;
+import static com.github.nmorel.gwtjackson.rebind.writer.JTypeName.parameterizedName;
+import static com.github.nmorel.gwtjackson.rebind.writer.JTypeName.rawName;
+import static com.github.nmorel.gwtjackson.rebind.writer.JTypeName.typeName;
 
 /**
  * @author Nicolas Morel
@@ -118,7 +133,7 @@ public class BeanJsonSerializerCreator extends AbstractBeanJsonCreator {
         if ( null != propertyInfo && propertyInfo.getGetterAccessor().isPresent() && !propertyInfo.isIgnored() ) {
             if ( propertyInfo.isRawValue() ) {
                 return new JSerializerType.Builder().type( propertyInfo.getType() ).instance( CodeBlock.builder()
-                        .add( "$T.<$T>getInstance()", RawValueJsonSerializer.class, JClassName.get( propertyInfo.getType() ) ).build() )
+                        .add( "$T.<$T>getInstance()", RawValueJsonSerializer.class, typeName( propertyInfo.getType() ) ).build() )
                         .build();
             } else {
                 try {
@@ -135,8 +150,8 @@ public class BeanJsonSerializerCreator extends AbstractBeanJsonCreator {
         return MethodSpec.methodBuilder( "initValueSerializer" )
                 .addModifiers( Modifier.PROTECTED )
                 .addAnnotation( Override.class )
-                .returns( ParameterizedTypeName.get( ClassName.get( BeanPropertySerializer.class ), JClassName.get( beanInfo
-                        .getType() ), WildcardTypeName.subtypeOf( Object.class ) ) )
+                .returns( ParameterizedTypeName.get(
+                        ClassName.get( BeanPropertySerializer.class ), typeName( beanInfo.getType() ), DEFAULT_WILDCARD ) )
                 .addStatement( "return $L", buildSerializer( propertyInfo, getJsonSerializerFromProperty( propertyInfo ) ) )
                 .build();
     }
@@ -159,17 +174,15 @@ public class BeanJsonSerializerCreator extends AbstractBeanJsonCreator {
         return builder.build();
     }
 
-    private MethodSpec buildInitAnyGetterPropertySerializerMethod( PropertyInfo anyGetterPropertyInfo ) throws
-            UnableToCompleteException {
-
+    private MethodSpec buildInitAnyGetterPropertySerializerMethod( PropertyInfo anyGetterPropertyInfo )
+            throws UnableToCompleteException {
         return MethodSpec.methodBuilder( "initAnyGetterPropertySerializer" )
                 .addModifiers( Modifier.PROTECTED )
                 .addAnnotation( Override.class )
-                .returns( JClassName.get( AnyGetterPropertySerializer.class, beanInfo.getType() ) )
+                .returns( parameterizedName( AnyGetterPropertySerializer.class, beanInfo.getType() ) )
                 .addStatement( "return $L",
                         buildSerializer( anyGetterPropertyInfo, getJsonSerializerFromProperty( anyGetterPropertyInfo ) ) )
                 .build();
-
     }
 
     private TypeSpec buildSerializer( PropertyInfo property, JSerializerType serializerType ) throws UnableToCompleteException {
@@ -180,10 +193,10 @@ public class BeanJsonSerializerCreator extends AbstractBeanJsonCreator {
 
         if ( property.isAnyGetter() ) {
             builder = TypeSpec.anonymousClassBuilder( "" )
-                    .superclass( JClassName.get( AnyGetterPropertySerializer.class, beanInfo.getType() ) );
+                    .superclass( parameterizedName( AnyGetterPropertySerializer.class, beanInfo.getType() ) );
         } else {
             builder = TypeSpec.anonymousClassBuilder( "\"$L\"", escapedPropertyName )
-                    .superclass( JClassName.get( BeanPropertySerializer.class, beanInfo.getType(), property.getType() ) );
+                    .superclass( parameterizedName( BeanPropertySerializer.class, beanInfo.getType(), property.getType() ) );
         }
 
         buildBeanPropertySerializerBody( builder, beanInfo.getType(), property, serializerType );
@@ -194,7 +207,7 @@ public class BeanJsonSerializerCreator extends AbstractBeanJsonCreator {
                     .addModifiers( Modifier.PUBLIC )
                     .addAnnotation( Override.class )
                     .addParameter( JsonWriter.class, "writer" )
-                    .addParameter( JClassName.get( beanInfo.getType() ), "bean" )
+                    .addParameter( typeName( beanInfo.getType() ), "bean" )
                     .addParameter( JsonSerializationContext.class, "ctx" );
             if ( !property.isUnwrapped() ) {
                 methodBuilder.addStatement( "writer.name(propertyName)" );
@@ -210,7 +223,7 @@ public class BeanJsonSerializerCreator extends AbstractBeanJsonCreator {
         return MethodSpec.methodBuilder( "initIdentityInfo" )
                 .addModifiers( Modifier.PROTECTED )
                 .addAnnotation( Override.class )
-                .returns( JClassName.get( IdentitySerializationInfo.class, beanInfo.getType() ) )
+                .returns( parameterizedName( IdentitySerializationInfo.class, beanInfo.getType() ) )
                 .addStatement( "return $L",
                         generateIdentifierSerializationInfo( beanInfo.getType(), beanInfo.getIdentityInfo().get(), serializerType ) )
                 .build();
@@ -220,13 +233,13 @@ public class BeanJsonSerializerCreator extends AbstractBeanJsonCreator {
         return MethodSpec.methodBuilder( "initTypeInfo" )
                 .addModifiers( Modifier.PROTECTED )
                 .addAnnotation( Override.class )
-                .returns( JClassName.get( TypeSerializationInfo.class, beanInfo.getType() ) )
+                .returns( parameterizedName( TypeSerializationInfo.class, beanInfo.getType() ) )
                 .addStatement( "return $L", generateTypeInfo( beanInfo.getTypeInfo().get(), true ) )
                 .build();
     }
 
-    private MethodSpec buildInitMapSubtypeClassToSerializerMethod( ImmutableList<JClassType> subtypes ) throws
-            UnableToCompleteException {
+    private MethodSpec buildInitMapSubtypeClassToSerializerMethod( ImmutableList<JClassType> subtypes )
+            throws UnableToCompleteException {
 
         Class[] mapTypes = new Class[]{Class.class, SubtypeSerializer.class};
         TypeName resultType = ParameterizedTypeName.get( Map.class, mapTypes );
@@ -254,12 +267,10 @@ public class BeanJsonSerializerCreator extends AbstractBeanJsonCreator {
                     || null != subtype.isEnum()
                     || Enum.class.getName().equals( subtype.getQualifiedSourceName() ) ) {
                 subtypeClass = DefaultSubtypeSerializer.class;
-                serializerClass = ParameterizedTypeName.get(
-                        ClassName.get( JsonSerializer.class ), WildcardTypeName.subtypeOf( Object.class ) );
+                serializerClass = ParameterizedTypeName.get( ClassName.get( JsonSerializer.class ), DEFAULT_WILDCARD );
             } else {
                 subtypeClass = BeanSubtypeSerializer.class;
-                serializerClass = ParameterizedTypeName.get(
-                        ClassName.get( AbstractBeanJsonSerializer.class ), WildcardTypeName.subtypeOf( Object.class ) );
+                serializerClass = ParameterizedTypeName.get( ClassName.get( AbstractBeanJsonSerializer.class ), DEFAULT_WILDCARD );
             }
 
             TypeSpec subtypeType = TypeSpec.anonymousClassBuilder( "" )
@@ -272,10 +283,176 @@ public class BeanJsonSerializerCreator extends AbstractBeanJsonCreator {
                                     .build()
                     ).build();
 
-            builder.addStatement( "map.put($T.class, $L)", JClassName.getRaw( subtype ), subtypeType );
+            builder.addStatement( "map.put($T.class, $L)", rawName( subtype ), subtypeType );
         }
 
         builder.addStatement( "return map" );
         return builder.build();
+    }
+
+    private Optional<JSerializerType> getIdentitySerializerType( BeanIdentityInfo identityInfo ) throws UnableToCompleteException,
+            UnsupportedTypeException {
+        if ( identityInfo.isIdABeanProperty() ) {
+            return Optional.absent();
+        } else {
+            return Optional.of( getJsonSerializerFromType( identityInfo.getType().get() ) );
+        }
+    }
+
+    private TypeSpec generateIdentifierSerializationInfo( JClassType type, BeanIdentityInfo identityInfo,
+                                                          Optional<JSerializerType> serializerType ) throws UnableToCompleteException,
+            UnsupportedTypeException {
+
+        TypeSpec.Builder builder = TypeSpec
+                .anonymousClassBuilder( "$L, $S", identityInfo.isAlwaysAsId(), identityInfo.getPropertyName() );
+
+        if ( identityInfo.isIdABeanProperty() ) {
+
+            BeanJsonMapperInfo mapperInfo = typeOracle.getBeanJsonMapperInfo( type );
+            PropertyInfo propertyInfo = mapperInfo.getProperties().get( identityInfo.getPropertyName() );
+            JSerializerType propertySerializerType = getJsonSerializerFromType( propertyInfo.getType() );
+
+            builder.superclass( parameterizedName( PropertyIdentitySerializationInfo.class, type, propertyInfo.getType() ) );
+
+            buildBeanPropertySerializerBody( builder, type, propertyInfo, propertySerializerType );
+
+        } else {
+            JType qualifiedType = identityInfo.getType().get();
+
+            builder.superclass( parameterizedName( AbstractIdentitySerializationInfo.class, type, qualifiedType ) );
+
+            builder.addMethod( MethodSpec.methodBuilder( "newSerializer" )
+                    .addModifiers( Modifier.PROTECTED )
+                    .addAnnotation( Override.class )
+                    .returns( ParameterizedTypeName.get( ClassName.get( JsonSerializer.class ), DEFAULT_WILDCARD ) )
+                    .addStatement( "return $L", serializerType.get().getInstance() )
+                    .build() );
+
+            TypeName generatorType = parameterizedName( ObjectIdGenerator.class, qualifiedType );
+            TypeName returnType = parameterizedName( ObjectIdSerializer.class, qualifiedType );
+
+            builder.addMethod( MethodSpec.methodBuilder( "getObjectId" )
+                    .addModifiers( Modifier.PUBLIC )
+                    .addAnnotation( Override.class )
+                    .returns( returnType )
+                    .addParameter( typeName( type ), "bean" )
+                    .addParameter( JsonSerializationContext.class, "ctx" )
+                    .addStatement( "$T generator = new $T().forScope($T.class)",
+                            generatorType, identityInfo.getGenerator(), identityInfo.getScope() )
+                    .addStatement( "$T scopedGen = ctx.findObjectIdGenerator(generator)", generatorType )
+                    .beginControlFlow( "if (null == scopedGen)" )
+                    .addStatement( "scopedGen = generator.newForSerialization(ctx)" )
+                    .addStatement( "ctx.addGenerator(scopedGen)" )
+                    .endControlFlow()
+                    .addStatement( "return new $T(scopedGen.generateId(bean), getSerializer())", returnType )
+                    .build() );
+        }
+
+        return builder.build();
+    }
+
+    private void buildBeanPropertySerializerBody( TypeSpec.Builder builder, JClassType beanType, PropertyInfo property, JSerializerType
+            serializerType ) throws UnableToCompleteException {
+        String paramName = "bean";
+        Accessor getterAccessor = property.getGetterAccessor().get().getAccessor( paramName );
+
+        MethodSpec.Builder newSerializerMethodBuilder = MethodSpec.methodBuilder( "newSerializer" )
+                .addModifiers( Modifier.PROTECTED )
+                .addAnnotation( Override.class )
+                .addStatement( "return $L", serializerType.getInstance() );
+        if ( property.isAnyGetter() ) {
+            newSerializerMethodBuilder.returns( MapJsonSerializer.class );
+        } else {
+            newSerializerMethodBuilder.returns( ParameterizedTypeName.get( ClassName.get( JsonSerializer.class ), DEFAULT_WILDCARD ) );
+        }
+        builder.addMethod( newSerializerMethodBuilder.build() );
+
+        Optional<MethodSpec> paramMethod = generatePropertySerializerParameters( property, serializerType );
+        if ( paramMethod.isPresent() ) {
+            builder.addMethod( paramMethod.get() );
+        }
+
+        builder.addMethod( MethodSpec.methodBuilder( "getValue" )
+                        .addModifiers( Modifier.PUBLIC )
+                        .addAnnotation( Override.class )
+                        .returns( typeName( true, property.getType() ) ) // the boxed type is specified so we can't return a primitive
+                        .addParameter( typeName( beanType ), paramName )
+                        .addParameter( JsonSerializationContext.class, "ctx" )
+                        .addStatement( "return $L", getterAccessor.getAccessor() )
+                        .build()
+        );
+
+        if ( getterAccessor.getAdditionalMethod().isPresent() ) {
+            builder.addMethod( getterAccessor.getAdditionalMethod().get() );
+        }
+    }
+
+    private Optional<MethodSpec> generatePropertySerializerParameters( PropertyInfo property, JSerializerType serializerType )
+            throws UnableToCompleteException {
+
+        if ( !property.getFormat().isPresent()
+                && !property.getIgnoredProperties().isPresent()
+                && !property.getIgnoreUnknown().isPresent()
+                && !property.getIdentityInfo().isPresent()
+                && !property.getTypeInfo().isPresent()
+                && !property.getInclude().isPresent()
+                && !property.isUnwrapped() ) {
+            // none of the parameter are set so we don't generate the method
+            return Optional.absent();
+        }
+
+        JClassType annotatedType = findFirstTypeToApplyPropertyAnnotation( serializerType );
+
+        CodeBlock.Builder paramBuilder = CodeBlock.builder()
+                .add( "return new $T()", JsonSerializerParameters.class )
+                .indent()
+                .indent();
+
+        buildCommonPropertyParameters( paramBuilder, property );
+
+        if ( property.getFormat().isPresent() ) {
+            JsonFormat format = property.getFormat().get();
+            if ( !Strings.isNullOrEmpty( format.timezone() ) && !JsonFormat.DEFAULT_TIMEZONE.equals( format.timezone() ) ) {
+                java.util.TimeZone timeZoneJdk = java.util.TimeZone.getTimeZone( format.timezone() );
+                // in java the offset is in milliseconds from timezone to GMT
+                // in gwt the offset is in minutes from GMT to timezone
+                // so we convert the milliseconds in minutes and invert the sign
+                int timeZoneOffsetGwt = (timeZoneJdk.getRawOffset() / 1000 / 60) * -1;
+                paramBuilder.add( "\n.setTimezone($T.createTimeZone($L))", TimeZone.class, timeZoneOffsetGwt );
+            }
+        }
+
+        if ( property.getInclude().isPresent() ) {
+            paramBuilder.add( "\n.setInclude($T.$L)", Include.class, property.getInclude().get().name() );
+        }
+
+        if ( property.getIdentityInfo().isPresent() ) {
+            try {
+                Optional<JSerializerType> identitySerializerType = getIdentitySerializerType( property.getIdentityInfo().get() );
+                paramBuilder.add( "\n.setIdentityInfo($L)",
+                        generateIdentifierSerializationInfo( annotatedType, property.getIdentityInfo().get(), identitySerializerType ) );
+            } catch ( UnsupportedTypeException e ) {
+                logger.log( Type.WARN, "Identity type is not supported. We ignore it." );
+            }
+        }
+
+        if ( property.getTypeInfo().isPresent() ) {
+            paramBuilder.add( "\n.setTypeInfo($L)", generateTypeInfo( property.getTypeInfo().get(), true ) );
+        }
+
+        if ( property.isUnwrapped() ) {
+            paramBuilder.add( "\n.setUnwrapped(true)" );
+        }
+
+        paramBuilder.add( ";\n" )
+                .unindent()
+                .unindent();
+
+        return Optional.of( MethodSpec.methodBuilder( "newParameters" )
+                .addModifiers( Modifier.PROTECTED )
+                .addAnnotation( Override.class )
+                .returns( JsonSerializerParameters.class )
+                .addCode( paramBuilder.build() )
+                .build() );
     }
 }

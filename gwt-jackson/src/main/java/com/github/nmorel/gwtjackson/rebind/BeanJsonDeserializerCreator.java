@@ -33,6 +33,7 @@ import com.github.nmorel.gwtjackson.client.JsonDeserializationContext;
 import com.github.nmorel.gwtjackson.client.JsonDeserializer;
 import com.github.nmorel.gwtjackson.client.JsonDeserializerParameters;
 import com.github.nmorel.gwtjackson.client.deser.bean.AbstractBeanJsonDeserializer;
+import com.github.nmorel.gwtjackson.client.deser.bean.AbstractIdentityDeserializationInfo;
 import com.github.nmorel.gwtjackson.client.deser.bean.AnySetterDeserializer;
 import com.github.nmorel.gwtjackson.client.deser.bean.BackReferenceProperty;
 import com.github.nmorel.gwtjackson.client.deser.bean.BeanPropertyDeserializer;
@@ -40,6 +41,7 @@ import com.github.nmorel.gwtjackson.client.deser.bean.HasDeserializerAndParamete
 import com.github.nmorel.gwtjackson.client.deser.bean.IdentityDeserializationInfo;
 import com.github.nmorel.gwtjackson.client.deser.bean.Instance;
 import com.github.nmorel.gwtjackson.client.deser.bean.InstanceBuilder;
+import com.github.nmorel.gwtjackson.client.deser.bean.PropertyIdentityDeserializationInfo;
 import com.github.nmorel.gwtjackson.client.deser.bean.SimpleStringMap;
 import com.github.nmorel.gwtjackson.client.deser.bean.SubtypeDeserializer;
 import com.github.nmorel.gwtjackson.client.deser.bean.SubtypeDeserializer.BeanSubtypeDeserializer;
@@ -54,7 +56,7 @@ import com.github.nmorel.gwtjackson.rebind.property.FieldAccessor;
 import com.github.nmorel.gwtjackson.rebind.property.FieldAccessor.Accessor;
 import com.github.nmorel.gwtjackson.rebind.property.PropertyInfo;
 import com.github.nmorel.gwtjackson.rebind.type.JDeserializerType;
-import com.github.nmorel.gwtjackson.rebind.writer.JClassName;
+import com.github.nmorel.gwtjackson.rebind.writer.JsniCodeBlockBuilder;
 import com.google.gwt.core.ext.GeneratorContext;
 import com.google.gwt.core.ext.TreeLogger;
 import com.google.gwt.core.ext.TreeLogger.Type;
@@ -76,9 +78,12 @@ import com.squareup.javapoet.MethodSpec;
 import com.squareup.javapoet.ParameterizedTypeName;
 import com.squareup.javapoet.TypeName;
 import com.squareup.javapoet.TypeSpec;
-import com.squareup.javapoet.WildcardTypeName;
 
 import static com.github.nmorel.gwtjackson.rebind.CreatorUtils.getDefaultValueForType;
+import static com.github.nmorel.gwtjackson.rebind.writer.JTypeName.DEFAULT_WILDCARD;
+import static com.github.nmorel.gwtjackson.rebind.writer.JTypeName.parameterizedName;
+import static com.github.nmorel.gwtjackson.rebind.writer.JTypeName.rawName;
+import static com.github.nmorel.gwtjackson.rebind.writer.JTypeName.typeName;
 
 /**
  * @author Nicolas Morel
@@ -141,7 +146,7 @@ public class BeanJsonDeserializerCreator extends AbstractBeanJsonCreator {
         return MethodSpec.methodBuilder( "initInstanceBuilder" )
                 .addModifiers( Modifier.PROTECTED )
                 .addAnnotation( Override.class )
-                .returns( ParameterizedTypeName.get( ClassName.get( InstanceBuilder.class ), JClassName.get( beanInfo.getType() ) ) )
+                .returns( parameterizedName( InstanceBuilder.class, beanInfo.getType() ) )
                 .addStatement( "return $L", buildInstanceBuilderClass() )
                 .build();
     }
@@ -149,15 +154,14 @@ public class BeanJsonDeserializerCreator extends AbstractBeanJsonCreator {
     private TypeSpec buildInstanceBuilderClass() throws UnableToCompleteException, UnsupportedTypeException {
 
         TypeSpec.Builder instanceBuilder = TypeSpec.anonymousClassBuilder( "" )
-                .addSuperinterface( ParameterizedTypeName.get( ClassName.get( InstanceBuilder.class ), JClassName.get( beanInfo
-                        .getType() ) ) );
+                .addSuperinterface( parameterizedName( InstanceBuilder.class, beanInfo.getType() ) );
 
         if ( null != beanInfo.getCreatorParameters() && !beanInfo.getCreatorParameters().isEmpty() ) {
             // for each constructor parameters, we initialize its deserializer.
             int index = 0;
             for ( Entry<String, JParameter> entry : beanInfo.getCreatorParameters().entrySet() ) {
 
-                TypeName typeName = JClassName.get( true, entry.getValue().getType() );
+                TypeName typeName = typeName( true, entry.getValue().getType() );
                 TypeName deserializerTypeName = ParameterizedTypeName.get( ClassName.get( HasDeserializerAndParameters.class ), typeName,
                         ParameterizedTypeName.get( ClassName.get( JsonDeserializer.class ), typeName ) );
 
@@ -182,7 +186,7 @@ public class BeanJsonDeserializerCreator extends AbstractBeanJsonCreator {
         MethodSpec.Builder newInstanceMethodBuilder = MethodSpec.methodBuilder( "newInstance" )
                 .addModifiers( Modifier.PUBLIC )
                 .addAnnotation( Override.class )
-                .returns( ParameterizedTypeName.get( ClassName.get( Instance.class ), JClassName.get( beanInfo.getType() ) ) )
+                .returns( parameterizedName( Instance.class, beanInfo.getType() ) )
                 .addParameter( JsonReader.class, "reader" )
                 .addParameter( JsonDeserializationContext.class, "ctx" )
                 .addParameter( ParameterizedTypeName.get( Map.class, String.class, String.class ), "bufferedProperties" );
@@ -210,7 +214,7 @@ public class BeanJsonDeserializerCreator extends AbstractBeanJsonCreator {
      */
     private void buildNewInstanceMethodForDefaultConstructor( MethodSpec.Builder newInstanceMethodBuilder, MethodSpec createMethod ) {
         newInstanceMethodBuilder.addStatement( "return new $T($N(), bufferedProperties)",
-                ParameterizedTypeName.get( ClassName.get( Instance.class ), JClassName.get( beanInfo.getType() ) ), createMethod );
+                parameterizedName( Instance.class, beanInfo.getType() ), createMethod );
     }
 
     /**
@@ -234,7 +238,7 @@ public class BeanJsonDeserializerCreator extends AbstractBeanJsonCreator {
             PropertyInfo propertyInfo = properties.get( name );
 
             newInstanceMethodBuilder.addCode( "$T $L = $L; // property '$L'\n",
-                    JClassName.get( propertyInfo.getType() ), variableName, getDefaultValueForType( propertyInfo.getType() ), name );
+                    typeName( propertyInfo.getType() ), variableName, getDefaultValueForType( propertyInfo.getType() ), name );
 
             if ( propertyInfo.isRequired() ) {
                 requiredProperties.add( name );
@@ -326,7 +330,7 @@ public class BeanJsonDeserializerCreator extends AbstractBeanJsonCreator {
         }
 
         newInstanceMethodBuilder.addStatement( "return new $T($N($L), bufferedProperties)",
-                JClassName.get( Instance.class, beanInfo.getType() ),
+                parameterizedName( Instance.class, beanInfo.getType() ),
                 createMethod,
                 Joiner.on( ", " ).join( propertyNameToVariable.values() ) );
     }
@@ -344,7 +348,7 @@ public class BeanJsonDeserializerCreator extends AbstractBeanJsonCreator {
                 .format( INSTANCE_BUILDER_VARIABLE_FORMAT, 0 ) );
 
         newInstanceMethodBuilder.addStatement( "return new $T($N($L), bufferedProperties)",
-                JClassName.get( Instance.class, beanInfo.getType() ), createMethod, param );
+                parameterizedName( Instance.class, beanInfo.getType() ), createMethod, param );
     }
 
     private MethodSpec buildInstanceBuilderCreateMethod() {
@@ -352,7 +356,7 @@ public class BeanJsonDeserializerCreator extends AbstractBeanJsonCreator {
 
         MethodSpec.Builder builder = MethodSpec.methodBuilder( "create" )
                 .addModifiers( Modifier.PRIVATE )
-                .returns( JClassName.get( beanInfo.getType() ) );
+                .returns( typeName( beanInfo.getType() ) );
 
         StringBuilder parametersNameBuilder = new StringBuilder();
         int index = 0;
@@ -363,7 +367,7 @@ public class BeanJsonDeserializerCreator extends AbstractBeanJsonCreator {
             PropertyInfo property = properties.get( parameterEntry.getKey() );
 
             String variableName = String.format( INSTANCE_BUILDER_VARIABLE_FORMAT, index++ );
-            builder.addParameter( JClassName.get( property.getType() ), variableName );
+            builder.addParameter( typeName( property.getType() ), variableName );
             parametersNameBuilder.append( variableName );
         }
         String parametersName = parametersNameBuilder.toString();
@@ -371,18 +375,14 @@ public class BeanJsonDeserializerCreator extends AbstractBeanJsonCreator {
         if ( method.isPrivate() || (!method.isPublic() && !mapperInfo.isSamePackage()) ) {
             // private method, we use jsni
             builder.addModifiers( Modifier.NATIVE );
-
-            CodeBlock.Builder jsniCode = CodeBlock.builder()
-                    .add( " /*-{\n" ).indent();
-            jsniCode.addStatement( "return $L($L)", method.getJsniSignature(), parametersName );
-            jsniCode.unindent().add( "}-*/" );
-
-            builder.addCode( jsniCode.build() );
+            builder.addCode( JsniCodeBlockBuilder.builder()
+                    .addStatement( "return $L($L)", method.getJsniSignature(), parametersName )
+                    .build() );
         } else {
             if ( null != method.isConstructor() ) {
-                builder.addStatement( "return new $T($L)", JClassName.get( beanInfo.getType() ), parametersName );
+                builder.addStatement( "return new $T($L)", typeName( beanInfo.getType() ), parametersName );
             } else {
-                builder.addStatement( "return $T.$L($L)", JClassName.get( beanInfo.getType() ), method.getName(), parametersName );
+                builder.addStatement( "return $T.$L($L)", typeName( beanInfo.getType() ), method.getName(), parametersName );
             }
         }
 
@@ -470,9 +470,8 @@ public class BeanJsonDeserializerCreator extends AbstractBeanJsonCreator {
         return Optional.of( MethodSpec.methodBuilder( "initAnySetterDeserializer" )
                 .addModifiers( Modifier.PROTECTED )
                 .addAnnotation( Override.class )
-                .returns( ParameterizedTypeName.get( ClassName.get( AnySetterDeserializer.class ),
-                        JClassName.get( beanInfo.getType() ),
-                        WildcardTypeName.subtypeOf( Object.class ) ) )
+                .returns( ParameterizedTypeName.get(
+                        ClassName.get( AnySetterDeserializer.class ), typeName( beanInfo.getType() ), DEFAULT_WILDCARD ) )
                 .addStatement( "return $L", buildDeserializer( anySetterPropertyInfo, type, deserializerType ) )
                 .build() );
     }
@@ -481,8 +480,7 @@ public class BeanJsonDeserializerCreator extends AbstractBeanJsonCreator {
 
         TypeName resultType = ParameterizedTypeName.get( ClassName.get( SimpleStringMap.class ),
                 ParameterizedTypeName.get( ClassName.get( BeanPropertyDeserializer.class ),
-                        JClassName.get( beanInfo.getType() ),
-                        WildcardTypeName.subtypeOf( Object.class ) ) );
+                        typeName( beanInfo.getType() ), DEFAULT_WILDCARD ) );
 
         MethodSpec.Builder builder = MethodSpec.methodBuilder( "initDeserializers" )
                 .addModifiers( Modifier.PROTECTED )
@@ -519,7 +517,7 @@ public class BeanJsonDeserializerCreator extends AbstractBeanJsonCreator {
         }
 
         TypeSpec.Builder builder = TypeSpec.anonymousClassBuilder( "" )
-                .superclass( JClassName.get( superclass, beanInfo.getType(), propertyType ) );
+                .superclass( parameterizedName( superclass, beanInfo.getType(), propertyType ) );
 
         List<MethodSpec> commonMethods = buildCommonPropertyDeserializerMethods( property, deserializerType );
         for ( MethodSpec commonMethod : commonMethods ) {
@@ -529,11 +527,11 @@ public class BeanJsonDeserializerCreator extends AbstractBeanJsonCreator {
         MethodSpec.Builder methodBuilder = MethodSpec.methodBuilder( "setValue" )
                 .addModifiers( Modifier.PUBLIC )
                 .addAnnotation( Override.class )
-                .addParameter( JClassName.get( beanInfo.getType() ), paramBean );
+                .addParameter( typeName( beanInfo.getType() ), paramBean );
         if ( property.isAnySetter() ) {
             methodBuilder.addParameter( String.class, paramProperty );
         }
-        methodBuilder.addParameter( JClassName.get( true, propertyType ), paramValue )
+        methodBuilder.addParameter( typeName( true, propertyType ), paramValue )
                 .addParameter( JsonDeserializationContext.class, "ctx" )
                 .addStatement( "$L", accessor.getAccessor() );
 
@@ -563,7 +561,7 @@ public class BeanJsonDeserializerCreator extends AbstractBeanJsonCreator {
         result.add( MethodSpec.methodBuilder( "newDeserializer" )
                 .addModifiers( Modifier.PROTECTED )
                 .addAnnotation( Override.class )
-                .returns( ParameterizedTypeName.get( ClassName.get( JsonDeserializer.class ), WildcardTypeName.subtypeOf( Object.class ) ) )
+                .returns( ParameterizedTypeName.get( ClassName.get( JsonDeserializer.class ), DEFAULT_WILDCARD ) )
                 .addStatement( "return $L", deserializerType.getInstance() )
                 .build() );
 
@@ -637,7 +635,7 @@ public class BeanJsonDeserializerCreator extends AbstractBeanJsonCreator {
 
         TypeName resultType = ParameterizedTypeName.get( ClassName.get( SimpleStringMap.class ),
                 ParameterizedTypeName.get( ClassName.get( BackReferenceProperty.class ),
-                        JClassName.get( beanInfo.getType() ), WildcardTypeName.subtypeOf( Object.class ) ) );
+                        typeName( beanInfo.getType() ), DEFAULT_WILDCARD ) );
 
         MethodSpec.Builder builder = MethodSpec.methodBuilder( "initBackReferenceDeserializers" )
                 .addModifiers( Modifier.PROTECTED )
@@ -650,12 +648,12 @@ public class BeanJsonDeserializerCreator extends AbstractBeanJsonCreator {
             Accessor accessor = property.getSetterAccessor().get().getAccessor( paramBean, paramReference );
 
             TypeSpec.Builder anonymBuilder = TypeSpec.anonymousClassBuilder( "" )
-                    .superclass( JClassName.get( BackReferenceProperty.class, beanInfo.getType(), property.getType() ) )
+                    .superclass( parameterizedName( BackReferenceProperty.class, beanInfo.getType(), property.getType() ) )
                     .addMethod( MethodSpec.methodBuilder( "setBackReference" )
                                     .addModifiers( Modifier.PUBLIC )
                                     .addAnnotation( Override.class )
-                                    .addParameter( JClassName.get( beanInfo.getType() ), paramBean )
-                                    .addParameter( JClassName.get( property.getType() ), paramReference )
+                                    .addParameter( typeName( beanInfo.getType() ), paramBean )
+                                    .addParameter( typeName( property.getType() ), paramReference )
                                     .addParameter( JsonDeserializationContext.class, "ctx" )
                                     .addStatement( "$L", accessor.getAccessor() )
                                     .build()
@@ -712,7 +710,7 @@ public class BeanJsonDeserializerCreator extends AbstractBeanJsonCreator {
         MethodSpec.Builder builder = MethodSpec.methodBuilder( "initIdentityInfo" )
                 .addModifiers( Modifier.PROTECTED )
                 .addAnnotation( Override.class )
-                .returns( JClassName.get( IdentityDeserializationInfo.class, beanInfo.getType() ) );
+                .returns( parameterizedName( IdentityDeserializationInfo.class, beanInfo.getType() ) );
 
         if ( identityInfo.isIdABeanProperty() ) {
             builder.addStatement( "return $L", buildPropertyIdentifierDeserializationInfo( beanInfo.getType(), identityInfo ) );
@@ -725,11 +723,32 @@ public class BeanJsonDeserializerCreator extends AbstractBeanJsonCreator {
         return builder.build();
     }
 
+    private CodeBlock buildPropertyIdentifierDeserializationInfo( JClassType type, BeanIdentityInfo identityInfo ) {
+        return CodeBlock.builder().
+                add( "new $T($S, $T.class, $T.class)", parameterizedName( PropertyIdentityDeserializationInfo.class, type ),
+                        identityInfo.getPropertyName(), identityInfo.getGenerator(), identityInfo.getScope() )
+                .build();
+    }
+
+    private TypeSpec buildIdentifierDeserializationInfo( JClassType type, BeanIdentityInfo identityInfo,
+                                                         JDeserializerType deserializerType ) {
+        return TypeSpec.anonymousClassBuilder( "$S, $T.class, $T.class",
+                identityInfo.getPropertyName(), identityInfo.getGenerator(), identityInfo.getScope() )
+                .superclass( parameterizedName( AbstractIdentityDeserializationInfo.class, type, identityInfo.getType().get() ) )
+                .addMethod( MethodSpec.methodBuilder( "newDeserializer" )
+                                .addModifiers( Modifier.PROTECTED )
+                                .addAnnotation( Override.class )
+                                .returns( ParameterizedTypeName.get( ClassName.get( JsonDeserializer.class ), DEFAULT_WILDCARD ) )
+                                .addStatement( "return $L", deserializerType.getInstance() )
+                                .build()
+                ).build();
+    }
+
     private MethodSpec buildInitTypeInfoMethod( BeanTypeInfo beanTypeInfo ) throws UnableToCompleteException {
         return MethodSpec.methodBuilder( "initTypeInfo" )
                 .addModifiers( Modifier.PROTECTED )
                 .addAnnotation( Override.class )
-                .returns( JClassName.get( TypeDeserializationInfo.class, beanInfo.getType() ) )
+                .returns( parameterizedName( TypeDeserializationInfo.class, beanInfo.getType() ) )
                 .addStatement( "return $L", generateTypeInfo( beanTypeInfo, false ) )
                 .build();
     }
@@ -761,12 +780,10 @@ public class BeanJsonDeserializerCreator extends AbstractBeanJsonCreator {
             TypeName deserializerClass;
             if ( configuration.getDeserializer( subtype ).isPresent() || null != subtype.isEnum() ) {
                 subtypeClass = DefaultSubtypeDeserializer.class;
-                deserializerClass = ParameterizedTypeName.get(
-                        ClassName.get( JsonDeserializer.class ), WildcardTypeName.subtypeOf( Object.class ) );
+                deserializerClass = ParameterizedTypeName.get( ClassName.get( JsonDeserializer.class ), DEFAULT_WILDCARD );
             } else {
                 subtypeClass = BeanSubtypeDeserializer.class;
-                deserializerClass = ParameterizedTypeName.get(
-                        ClassName.get( AbstractBeanJsonDeserializer.class ), WildcardTypeName.subtypeOf( Object.class ) );
+                deserializerClass = ParameterizedTypeName.get( ClassName.get( AbstractBeanJsonDeserializer.class ), DEFAULT_WILDCARD );
             }
 
             TypeSpec subtypeType = TypeSpec.anonymousClassBuilder( "" )
@@ -779,7 +796,7 @@ public class BeanJsonDeserializerCreator extends AbstractBeanJsonCreator {
                                     .build()
                     ).build();
 
-            builder.addStatement( "map.put($T.class, $L)", JClassName.getRaw( subtype ), subtypeType );
+            builder.addStatement( "map.put($T.class, $L)", rawName( subtype ), subtypeType );
         }
 
         builder.addStatement( "return map" );

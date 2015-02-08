@@ -29,7 +29,6 @@ import com.github.nmorel.gwtjackson.client.ObjectMapper;
 import com.github.nmorel.gwtjackson.rebind.exception.UnsupportedTypeException;
 import com.github.nmorel.gwtjackson.rebind.type.JDeserializerType;
 import com.github.nmorel.gwtjackson.rebind.type.JSerializerType;
-import com.github.nmorel.gwtjackson.rebind.writer.JClassName;
 import com.google.gwt.core.ext.GeneratorContext;
 import com.google.gwt.core.ext.TreeLogger;
 import com.google.gwt.core.ext.TreeLogger.Type;
@@ -38,12 +37,12 @@ import com.google.gwt.core.ext.typeinfo.JClassType;
 import com.google.gwt.core.ext.typeinfo.JParameterizedType;
 import com.google.gwt.thirdparty.guava.common.base.Optional;
 import com.google.gwt.thirdparty.guava.common.base.Strings;
-import com.squareup.javapoet.ClassName;
 import com.squareup.javapoet.MethodSpec;
-import com.squareup.javapoet.ParameterizedTypeName;
 import com.squareup.javapoet.TypeSpec;
 
 import static com.github.nmorel.gwtjackson.rebind.CreatorUtils.findFirstEncounteredAnnotationsOnAllHierarchy;
+import static com.github.nmorel.gwtjackson.rebind.writer.JTypeName.parameterizedName;
+import static com.github.nmorel.gwtjackson.rebind.writer.JTypeName.typeName;
 
 /**
  * @author Nicolas Morel
@@ -75,7 +74,7 @@ public class ObjectMapperCreator extends AbstractCreator {
      * @throws UnableToCompleteException
      */
     public String create( JClassType interfaceClass ) throws UnableToCompleteException {
-        // we concatenate the name of all the enclosing class
+        // We concatenate the name of all the enclosing class.
         StringBuilder builder = new StringBuilder( interfaceClass.getSimpleSourceName() + "Impl" );
         JClassType enclosingType = interfaceClass.getEnclosingType();
         while ( null != enclosingType ) {
@@ -84,18 +83,17 @@ public class ObjectMapperCreator extends AbstractCreator {
         }
 
         String mapperClassSimpleName = builder.toString();
-        String packageName = interfaceClass.getPackage()
-                .getName();
+        String packageName = interfaceClass.getPackage().getName();
         String qualifiedMapperClassName = packageName + "." + mapperClassSimpleName;
 
         PrintWriter printWriter = getPrintWriter( packageName, mapperClassSimpleName );
-        // the class already exists, no need to continue
+        // The class already exists, no need to continue.
         if ( printWriter == null ) {
             return qualifiedMapperClassName;
         }
 
-        // Extract the type of the object to map
-        JClassType mappedTypeClass = getMappedType( interfaceClass );
+        // Extract the type of the object to map.
+        JClassType mappedTypeClass = extractMappedType( interfaceClass );
 
         boolean reader = typeOracle.isObjectReader( interfaceClass );
         boolean writer = typeOracle.isObjectWriter( interfaceClass );
@@ -112,16 +110,16 @@ public class ObjectMapperCreator extends AbstractCreator {
 
         TypeSpec.Builder mapperBuilder = TypeSpec.classBuilder( mapperClassSimpleName )
                 .addModifiers( Modifier.PUBLIC, Modifier.FINAL )
-                .addSuperinterface( JClassName.get( interfaceClass ) )
-                .superclass( ParameterizedTypeName.get( ClassName.get( abstractClass ), JClassName.get( mappedTypeClass ) ) )
-                .addMethod( createConstructor( mappedTypeClass ) );
+                .addSuperinterface( typeName( interfaceClass ) )
+                .superclass( parameterizedName( abstractClass, mappedTypeClass ) )
+                .addMethod( buildConstructor( mappedTypeClass ) );
 
         if ( reader ) {
-            mapperBuilder.addMethod( createDeserializer( mappedTypeClass ) );
+            mapperBuilder.addMethod( buildNewDeserializerMethod( mappedTypeClass ) );
         }
 
         if ( writer ) {
-            mapperBuilder.addMethod( createSerializer( mappedTypeClass ) );
+            mapperBuilder.addMethod( buildNewSerializerMethod( mappedTypeClass ) );
         }
 
         write( packageName, mapperBuilder.build(), printWriter );
@@ -129,7 +127,15 @@ public class ObjectMapperCreator extends AbstractCreator {
         return qualifiedMapperClassName;
     }
 
-    private JClassType getMappedType( JClassType interfaceClass ) throws UnableToCompleteException {
+    /**
+     * Extract the type to map from the interface.
+     *
+     * @param interfaceClass the interface
+     *
+     * @return the extracted type to map
+     * @throws UnableToCompleteException if we don't find the type
+     */
+    private JClassType extractMappedType( JClassType interfaceClass ) throws UnableToCompleteException {
         JClassType intf = interfaceClass.isInterface();
         if ( intf == null ) {
             logger.log( TreeLogger.Type.ERROR, "Expected " + interfaceClass + " to be an interface." );
@@ -138,47 +144,56 @@ public class ObjectMapperCreator extends AbstractCreator {
 
         JClassType[] intfs = intf.getImplementedInterfaces();
         for ( JClassType t : intfs ) {
-            if ( t.getQualifiedSourceName()
-                    .equals( OBJECT_MAPPER_CLASS ) ) {
+            if ( t.getQualifiedSourceName().equals( OBJECT_MAPPER_CLASS ) ) {
                 return extractParameterizedType( OBJECT_MAPPER_CLASS, t.isParameterized() );
-            } else if ( t.getQualifiedSourceName()
-                    .equals( OBJECT_READER_CLASS ) ) {
+            } else if ( t.getQualifiedSourceName().equals( OBJECT_READER_CLASS ) ) {
                 return extractParameterizedType( OBJECT_READER_CLASS, t.isParameterized() );
-            } else if ( t.getQualifiedSourceName()
-                    .equals( OBJECT_WRITER_CLASS ) ) {
+            } else if ( t.getQualifiedSourceName().equals( OBJECT_WRITER_CLASS ) ) {
                 return extractParameterizedType( OBJECT_WRITER_CLASS, t.isParameterized() );
             }
         }
-        logger.log( TreeLogger.Type.ERROR, "Expected  " + interfaceClass + " to extend one of the interface " + OBJECT_MAPPER_CLASS + ", " +
-                OBJECT_READER_CLASS + " or " + OBJECT_WRITER_CLASS );
+        logger.log( TreeLogger.Type.ERROR, "Expected  " + interfaceClass + " to extend one of the following interface : " +
+                OBJECT_MAPPER_CLASS + ", " + OBJECT_READER_CLASS + " or " + OBJECT_WRITER_CLASS );
         throw new UnableToCompleteException();
     }
 
-    private JClassType extractParameterizedType( String clazz, JParameterizedType genericType ) throws UnableToCompleteException {
-        if ( genericType == null ) {
-            logger.log( TreeLogger.Type.ERROR, "Expected the " + clazz + " declaration to specify a " +
-                    "parameterized type." );
+    /**
+     * Extract the parameter's type.
+     *
+     * @param clazz the name of the interface
+     * @param parameterizedType the parameterized type
+     *
+     * @return the extracted type
+     * @throws UnableToCompleteException if the type contains zero or more than one parameter
+     */
+    private JClassType extractParameterizedType( String clazz, JParameterizedType parameterizedType ) throws UnableToCompleteException {
+        if ( parameterizedType == null ) {
+            logger.log( TreeLogger.Type.ERROR, "Expected the " + clazz + " declaration to specify a parameterized type." );
             throw new UnableToCompleteException();
         }
-        JClassType[] typeParameters = genericType.getTypeArgs();
+        JClassType[] typeParameters = parameterizedType.getTypeArgs();
         if ( typeParameters == null || typeParameters.length != 1 ) {
-            logger.log( TreeLogger.Type.ERROR, "Expected the " + clazz + " declaration to specify 1 " +
-                    "parameterized type." );
+            logger.log( TreeLogger.Type.ERROR, "Expected the " + clazz + " declaration to specify 1 parameterized type." );
             throw new UnableToCompleteException();
         }
         return typeParameters[0];
     }
 
-    private MethodSpec createConstructor( JClassType mappedTypeClass ) {
-        Optional<JsonRootName> jsonRootName = findFirstEncounteredAnnotationsOnAllHierarchy( configuration, mappedTypeClass, JsonRootName
-                .class );
+    /**
+     * Build the constructor.
+     *
+     * @param mappedTypeClass the type to map
+     *
+     * @return the constructor method
+     */
+    private MethodSpec buildConstructor( JClassType mappedTypeClass ) {
+        Optional<JsonRootName> jsonRootName
+                = findFirstEncounteredAnnotationsOnAllHierarchy( configuration, mappedTypeClass, JsonRootName.class );
         String rootName;
-        if ( !jsonRootName.isPresent() || Strings.isNullOrEmpty( jsonRootName.get()
-                .value() ) ) {
+        if ( !jsonRootName.isPresent() || Strings.isNullOrEmpty( jsonRootName.get().value() ) ) {
             rootName = mappedTypeClass.getSimpleSourceName();
         } else {
-            rootName = jsonRootName.get()
-                    .value();
+            rootName = jsonRootName.get().value();
         }
 
         return MethodSpec.constructorBuilder()
@@ -187,7 +202,14 @@ public class ObjectMapperCreator extends AbstractCreator {
                 .build();
     }
 
-    private MethodSpec createDeserializer( JClassType mappedTypeClass ) throws UnableToCompleteException {
+    /**
+     * Build the new deserializer method.
+     *
+     * @param mappedTypeClass the type to map
+     *
+     * @return the method
+     */
+    private MethodSpec buildNewDeserializerMethod( JClassType mappedTypeClass ) throws UnableToCompleteException {
         JDeserializerType type;
         try {
             type = getJsonDeserializerFromType( mappedTypeClass );
@@ -199,12 +221,19 @@ public class ObjectMapperCreator extends AbstractCreator {
         return MethodSpec.methodBuilder( "newDeserializer" )
                 .addModifiers( Modifier.PROTECTED )
                 .addAnnotation( Override.class )
-                .returns( ParameterizedTypeName.get( ClassName.get( JsonDeserializer.class ), JClassName.get( mappedTypeClass ) ) )
+                .returns( parameterizedName( JsonDeserializer.class, mappedTypeClass ) )
                 .addStatement( "return $L", type.getInstance() )
                 .build();
     }
 
-    private MethodSpec createSerializer( JClassType mappedTypeClass ) throws UnableToCompleteException {
+    /**
+     * Build the new serializer method.
+     *
+     * @param mappedTypeClass the type to map
+     *
+     * @return the method
+     */
+    private MethodSpec buildNewSerializerMethod( JClassType mappedTypeClass ) throws UnableToCompleteException {
         JSerializerType type;
         try {
             type = getJsonSerializerFromType( mappedTypeClass );
@@ -216,7 +245,7 @@ public class ObjectMapperCreator extends AbstractCreator {
         return MethodSpec.methodBuilder( "newSerializer" )
                 .addModifiers( Modifier.PROTECTED )
                 .addAnnotation( Override.class )
-                .returns( ParameterizedTypeName.get( ClassName.get( JsonSerializer.class ), JClassName.get( mappedTypeClass ) ) )
+                .returns( parameterizedName( JsonSerializer.class, mappedTypeClass ) )
                 .addStatement( "return $L", type.getInstance() )
                 .build();
     }

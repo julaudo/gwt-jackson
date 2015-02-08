@@ -25,48 +25,31 @@ import java.util.Map.Entry;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonFormat.Shape;
-import com.fasterxml.jackson.annotation.JsonInclude.Include;
 import com.fasterxml.jackson.annotation.JsonTypeInfo.As;
-import com.fasterxml.jackson.annotation.ObjectIdGenerator;
 import com.github.nmorel.gwtjackson.client.JsonDeserializer;
-import com.github.nmorel.gwtjackson.client.JsonSerializationContext;
 import com.github.nmorel.gwtjackson.client.JsonSerializer;
-import com.github.nmorel.gwtjackson.client.JsonSerializerParameters;
 import com.github.nmorel.gwtjackson.client.deser.bean.AbstractBeanJsonDeserializer;
 import com.github.nmorel.gwtjackson.client.deser.bean.AbstractDelegationBeanJsonDeserializer;
-import com.github.nmorel.gwtjackson.client.deser.bean.AbstractIdentityDeserializationInfo;
 import com.github.nmorel.gwtjackson.client.deser.bean.AbstractObjectBeanJsonDeserializer;
 import com.github.nmorel.gwtjackson.client.deser.bean.AbstractSerializableBeanJsonDeserializer;
-import com.github.nmorel.gwtjackson.client.deser.bean.PropertyIdentityDeserializationInfo;
 import com.github.nmorel.gwtjackson.client.deser.bean.TypeDeserializationInfo;
 import com.github.nmorel.gwtjackson.client.ser.bean.AbstractBeanJsonSerializer;
-import com.github.nmorel.gwtjackson.client.ser.bean.AbstractIdentitySerializationInfo;
 import com.github.nmorel.gwtjackson.client.ser.bean.AbstractValueBeanJsonSerializer;
-import com.github.nmorel.gwtjackson.client.ser.bean.ObjectIdSerializer;
-import com.github.nmorel.gwtjackson.client.ser.bean.PropertyIdentitySerializationInfo;
 import com.github.nmorel.gwtjackson.client.ser.bean.TypeSerializationInfo;
-import com.github.nmorel.gwtjackson.client.ser.map.MapJsonSerializer;
-import com.github.nmorel.gwtjackson.rebind.bean.BeanIdentityInfo;
 import com.github.nmorel.gwtjackson.rebind.bean.BeanInfo;
 import com.github.nmorel.gwtjackson.rebind.bean.BeanProcessor;
 import com.github.nmorel.gwtjackson.rebind.bean.BeanTypeInfo;
 import com.github.nmorel.gwtjackson.rebind.exception.UnsupportedTypeException;
-import com.github.nmorel.gwtjackson.rebind.property.FieldAccessor.Accessor;
 import com.github.nmorel.gwtjackson.rebind.property.PropertiesContainer;
 import com.github.nmorel.gwtjackson.rebind.property.PropertyInfo;
 import com.github.nmorel.gwtjackson.rebind.property.processor.PropertyProcessor;
-import com.github.nmorel.gwtjackson.rebind.type.JDeserializerType;
 import com.github.nmorel.gwtjackson.rebind.type.JMapperType;
-import com.github.nmorel.gwtjackson.rebind.type.JSerializerType;
-import com.github.nmorel.gwtjackson.rebind.writer.JClassName;
 import com.google.gwt.core.ext.GeneratorContext;
 import com.google.gwt.core.ext.TreeLogger;
 import com.google.gwt.core.ext.TreeLogger.Type;
 import com.google.gwt.core.ext.UnableToCompleteException;
 import com.google.gwt.core.ext.typeinfo.JClassType;
-import com.google.gwt.core.ext.typeinfo.JType;
 import com.google.gwt.core.ext.typeinfo.JTypeParameter;
-import com.google.gwt.i18n.client.TimeZone;
 import com.google.gwt.thirdparty.guava.common.base.Optional;
 import com.google.gwt.thirdparty.guava.common.base.Strings;
 import com.google.gwt.thirdparty.guava.common.collect.ImmutableList;
@@ -76,13 +59,14 @@ import com.squareup.javapoet.CodeBlock;
 import com.squareup.javapoet.FieldSpec;
 import com.squareup.javapoet.MethodSpec;
 import com.squareup.javapoet.ParameterSpec;
-import com.squareup.javapoet.ParameterizedTypeName;
 import com.squareup.javapoet.TypeName;
 import com.squareup.javapoet.TypeSpec;
-import com.squareup.javapoet.WildcardTypeName;
 
 import static com.github.nmorel.gwtjackson.rebind.CreatorUtils.isObject;
 import static com.github.nmorel.gwtjackson.rebind.CreatorUtils.isSerializable;
+import static com.github.nmorel.gwtjackson.rebind.writer.JTypeName.parameterizedName;
+import static com.github.nmorel.gwtjackson.rebind.writer.JTypeName.rawName;
+import static com.github.nmorel.gwtjackson.rebind.writer.JTypeName.typeVariableName;
 
 /**
  * @author Nicolas Morel
@@ -182,18 +166,16 @@ public abstract class AbstractBeanJsonCreator extends AbstractCreator {
                 } else {
                     clazz = AbstractBeanJsonSerializer.class;
                 }
-                superclass = ParameterizedTypeName.get( ClassName.get( clazz ), JClassName.get( mapperInfo.getType() ) );
+                superclass = parameterizedName( clazz, mapperInfo.getType() );
             } else {
                 if ( isObject( mapperInfo.getType() ) ) {
                     superclass = ClassName.get( AbstractObjectBeanJsonDeserializer.class );
                 } else if ( isSerializable( mapperInfo.getType() ) ) {
                     superclass = ClassName.get( AbstractSerializableBeanJsonDeserializer.class );
                 } else if ( mapperInfo.getBeanInfo().isCreatorDelegation() ) {
-                    superclass = ParameterizedTypeName.get( ClassName.get( AbstractDelegationBeanJsonDeserializer.class ), JClassName
-                            .get( mapperInfo.getType() ) );
+                    superclass = parameterizedName( AbstractDelegationBeanJsonDeserializer.class, mapperInfo.getType() );
                 } else {
-                    superclass = ParameterizedTypeName.get( ClassName.get( AbstractBeanJsonDeserializer.class ), JClassName.get( mapperInfo
-                            .getType() ) );
+                    superclass = parameterizedName( AbstractBeanJsonDeserializer.class, mapperInfo.getType() );
                 }
             }
 
@@ -203,7 +185,7 @@ public abstract class AbstractBeanJsonCreator extends AbstractCreator {
 
             if ( null != mapperInfo.getType().isGenericType() ) {
                 for ( JTypeParameter typeParameter : mapperInfo.getType().isGenericType().getTypeParameters() ) {
-                    typeBuilder.addTypeVariable( JClassName.getTypeVariableName( typeParameter ) );
+                    typeBuilder.addTypeVariable( typeVariableName( typeParameter ) );
                 }
             }
 
@@ -237,20 +219,20 @@ public abstract class AbstractBeanJsonCreator extends AbstractCreator {
         MethodSpec.Builder constructorBuilder = MethodSpec.constructorBuilder().addModifiers( Modifier.PUBLIC );
 
         if ( !beanInfo.getParameterizedTypes().isEmpty() ) {
-            ClassName mapperClass;
+            Class mapperClass;
             String mapperNameFormat;
             if ( isSerializer() ) {
-                mapperClass = ClassName.get( JsonSerializer.class );
+                mapperClass = JsonSerializer.class;
                 mapperNameFormat = TYPE_PARAMETER_SERIALIZER_FIELD_NAME;
             } else {
-                mapperClass = ClassName.get( JsonDeserializer.class );
+                mapperClass = JsonDeserializer.class;
                 mapperNameFormat = TYPE_PARAMETER_DESERIALIZER_FIELD_NAME;
             }
 
             for ( int i = 0; i < beanInfo.getParameterizedTypes().size(); i++ ) {
                 JClassType argType = beanInfo.getParameterizedTypes().get( i );
                 String mapperName = String.format( mapperNameFormat, i );
-                TypeName mapperType = ParameterizedTypeName.get( mapperClass, JClassName.get( argType ) );
+                TypeName mapperType = parameterizedName( mapperClass, argType );
 
                 FieldSpec field = FieldSpec.builder( mapperType, mapperName, Modifier.PRIVATE, Modifier.FINAL ).build();
                 typeBuilder.addField( field );
@@ -269,95 +251,11 @@ public abstract class AbstractBeanJsonCreator extends AbstractCreator {
                 .addModifiers( Modifier.PUBLIC )
                 .addAnnotation( Override.class )
                 .returns( Class.class )
-                .addStatement( "return $T.class", JClassName.getRaw( beanInfo.getType() ) )
+                .addStatement( "return $T.class", rawName( beanInfo.getType() ) )
                 .build();
     }
 
     protected abstract void buildSpecific() throws UnableToCompleteException, UnsupportedTypeException;
-
-    protected Optional<JSerializerType> getIdentitySerializerType( BeanIdentityInfo identityInfo ) throws UnableToCompleteException,
-            UnsupportedTypeException {
-        if ( identityInfo.isIdABeanProperty() ) {
-            return Optional.absent();
-        } else {
-            return Optional.of( getJsonSerializerFromType( identityInfo.getType().get() ) );
-        }
-    }
-
-    protected TypeSpec generateIdentifierSerializationInfo( JClassType type, BeanIdentityInfo identityInfo,
-                                                            Optional<JSerializerType> serializerType ) throws UnableToCompleteException,
-            UnsupportedTypeException {
-
-        TypeSpec.Builder builder = TypeSpec
-                .anonymousClassBuilder( "$L, $S", identityInfo.isAlwaysAsId(), identityInfo.getPropertyName() );
-
-        if ( identityInfo.isIdABeanProperty() ) {
-
-            BeanJsonMapperInfo mapperInfo = typeOracle.getBeanJsonMapperInfo( type );
-            PropertyInfo propertyInfo = mapperInfo.getProperties().get( identityInfo.getPropertyName() );
-            JSerializerType propertySerializerType = getJsonSerializerFromType( propertyInfo.getType() );
-
-            builder.superclass( JClassName.get( PropertyIdentitySerializationInfo.class, type, propertyInfo.getType() ) );
-
-            buildBeanPropertySerializerBody( builder, type, propertyInfo, propertySerializerType );
-
-        } else {
-            JType qualifiedType = identityInfo.getType().get();
-
-            builder.superclass( JClassName.get( AbstractIdentitySerializationInfo.class, type, qualifiedType ) );
-
-            builder.addMethod( MethodSpec.methodBuilder( "newSerializer" )
-                    .addModifiers( Modifier.PROTECTED )
-                    .addAnnotation( Override.class )
-                    .returns( ParameterizedTypeName.get( ClassName.get( JsonSerializer.class ), WildcardTypeName
-                            .subtypeOf( Object.class ) ) )
-                    .addStatement( "return $L", serializerType.get().getInstance() )
-                    .build() );
-
-            TypeName generatorType = JClassName.get( ObjectIdGenerator.class, qualifiedType );
-            TypeName returnType = JClassName.get( ObjectIdSerializer.class, qualifiedType );
-
-            builder.addMethod( MethodSpec.methodBuilder( "getObjectId" )
-                    .addModifiers( Modifier.PUBLIC )
-                    .addAnnotation( Override.class )
-                    .returns( returnType )
-                    .addParameter( JClassName.get( type ), "bean" )
-                    .addParameter( JsonSerializationContext.class, "ctx" )
-                    .addStatement( "$T generator = new $T().forScope($T.class)",
-                            generatorType, identityInfo.getGenerator(), identityInfo.getScope() )
-                    .addStatement( "$T scopedGen = ctx.findObjectIdGenerator(generator)", generatorType )
-                    .beginControlFlow( "if (null == scopedGen)" )
-                    .addStatement( "scopedGen = generator.newForSerialization(ctx)" )
-                    .addStatement( "ctx.addGenerator(scopedGen)" )
-                    .endControlFlow()
-                    .addStatement( "return new $T(scopedGen.generateId(bean), getSerializer())", returnType )
-                    .build() );
-        }
-
-        return builder.build();
-    }
-
-    protected CodeBlock buildPropertyIdentifierDeserializationInfo( JClassType type, BeanIdentityInfo identityInfo ) {
-        return CodeBlock.builder().
-                add( "new $T($S, $T.class, $T.class)", JClassName.get( PropertyIdentityDeserializationInfo.class, type ),
-                        identityInfo.getPropertyName(), identityInfo.getGenerator(), identityInfo.getScope() )
-                .build();
-    }
-
-    protected TypeSpec buildIdentifierDeserializationInfo( JClassType type, BeanIdentityInfo identityInfo,
-                                                           JDeserializerType deserializerType ) {
-        return TypeSpec.anonymousClassBuilder( "$S, $T.class, $T.class",
-                identityInfo.getPropertyName(), identityInfo.getGenerator(), identityInfo.getScope() )
-                .superclass( JClassName.get( AbstractIdentityDeserializationInfo.class, type, identityInfo.getType().get() ) )
-                .addMethod( MethodSpec.methodBuilder( "newDeserializer" )
-                                .addModifiers( Modifier.PROTECTED )
-                                .addAnnotation( Override.class )
-                                .returns( ParameterizedTypeName.get( ClassName.get( JsonDeserializer.class ), WildcardTypeName
-                                        .subtypeOf( Object.class ) ) )
-                                .addStatement( "return $L", deserializerType.getInstance() )
-                                .build()
-                ).build();
-    }
 
     protected CodeBlock generateTypeInfo( BeanTypeInfo typeInfo, boolean serialization ) {
         CodeBlock.Builder builder = CodeBlock.builder()
@@ -374,7 +272,7 @@ public abstract class AbstractBeanJsonCreator extends AbstractCreator {
         }
 
         for ( Entry<JClassType, String> entry : mapTypeToMetadata.entrySet() ) {
-            builder.add( "\n.addTypeInfo($T.class, $S)", JClassName.getRaw( entry.getKey() ), entry.getValue() );
+            builder.add( "\n.addTypeInfo($T.class, $S)", rawName( entry.getKey() ), entry.getValue() );
         }
 
         return builder.unindent().unindent().build();
@@ -430,111 +328,5 @@ public abstract class AbstractBeanJsonCreator extends AbstractCreator {
         } else {
             return CreatorUtils.filterSubtypesForDeserialization( logger, configuration, beanInfo.getType() );
         }
-    }
-
-    protected void buildBeanPropertySerializerBody( TypeSpec.Builder builder, JClassType beanType, PropertyInfo property, JSerializerType
-            serializerType ) throws UnableToCompleteException {
-        String paramName = "bean";
-        Accessor getterAccessor = property.getGetterAccessor().get().getAccessor( paramName );
-
-        MethodSpec.Builder newSerializerMethodBuilder = MethodSpec.methodBuilder( "newSerializer" )
-                .addModifiers( Modifier.PROTECTED )
-                .addAnnotation( Override.class )
-                .addStatement( "return $L", serializerType.getInstance() );
-        if ( property.isAnyGetter() ) {
-            newSerializerMethodBuilder.returns( MapJsonSerializer.class );
-        } else {
-            newSerializerMethodBuilder.returns( ParameterizedTypeName
-                    .get( ClassName.get( JsonSerializer.class ), WildcardTypeName.subtypeOf( Object.class ) ) );
-        }
-        builder.addMethod( newSerializerMethodBuilder.build() );
-
-        Optional<MethodSpec> paramMethod = generatePropertySerializerParameters( property, serializerType );
-        if ( paramMethod.isPresent() ) {
-            builder.addMethod( paramMethod.get() );
-        }
-
-        builder.addMethod( MethodSpec.methodBuilder( "getValue" )
-                        .addModifiers( Modifier.PUBLIC )
-                        .addAnnotation( Override.class )
-                        .returns( JClassName.get( true, property.getType() ) ) // the boxed type is specified so we can't return a primitive
-                        .addParameter( JClassName.get( beanType ), paramName )
-                        .addParameter( JsonSerializationContext.class, "ctx" )
-                        .addStatement( "return $L", getterAccessor.getAccessor() )
-                        .build()
-        );
-
-        if ( getterAccessor.getAdditionalMethod().isPresent() ) {
-            builder.addMethod( getterAccessor.getAdditionalMethod().get() );
-        }
-    }
-
-    protected Optional<MethodSpec> generatePropertySerializerParameters( PropertyInfo property, JSerializerType serializerType )
-            throws UnableToCompleteException {
-
-        if ( !property.getFormat().isPresent()
-                && !property.getIgnoredProperties().isPresent()
-                && !property.getIgnoreUnknown().isPresent()
-                && !property.getIdentityInfo().isPresent()
-                && !property.getTypeInfo().isPresent()
-                && !property.getInclude().isPresent()
-                && !property.isUnwrapped() ) {
-            // none of the parameter are set so we don't generate the method
-            return Optional.absent();
-        }
-
-        JClassType annotatedType = findFirstTypeToApplyPropertyAnnotation( serializerType );
-
-        CodeBlock.Builder paramBuilder = CodeBlock.builder()
-                .add( "return new $T()", JsonSerializerParameters.class )
-                .indent()
-                .indent();
-
-        buildCommonPropertyParameters( paramBuilder, property );
-
-        if ( property.getFormat().isPresent() ) {
-            JsonFormat format = property.getFormat().get();
-            if ( !Strings.isNullOrEmpty( format.timezone() ) && !JsonFormat.DEFAULT_TIMEZONE.equals( format.timezone() ) ) {
-                java.util.TimeZone timeZoneJdk = java.util.TimeZone.getTimeZone( format.timezone() );
-                // in java the offset is in milliseconds from timezone to GMT
-                // in gwt the offset is in minutes from GMT to timezone
-                // so we convert the milliseconds in minutes and invert the sign
-                int timeZoneOffsetGwt = (timeZoneJdk.getRawOffset() / 1000 / 60) * -1;
-                paramBuilder.add( "\n.setTimezone($T.createTimeZone($L))", TimeZone.class, timeZoneOffsetGwt );
-            }
-        }
-
-        if ( property.getInclude().isPresent() ) {
-            paramBuilder.add( "\n.setInclude($T.$L)", Include.class, property.getInclude().get().name() );
-        }
-
-        if ( property.getIdentityInfo().isPresent() ) {
-            try {
-                Optional<JSerializerType> identitySerializerType = getIdentitySerializerType( property.getIdentityInfo().get() );
-                paramBuilder.add( "\n.setIdentityInfo($L)",
-                        generateIdentifierSerializationInfo( annotatedType, property.getIdentityInfo().get(), identitySerializerType ) );
-            } catch ( UnsupportedTypeException e ) {
-                logger.log( Type.WARN, "Identity type is not supported. We ignore it." );
-            }
-        }
-
-        if ( property.getTypeInfo().isPresent() ) {
-            paramBuilder.add( "\n.setTypeInfo($L)", generateTypeInfo( property.getTypeInfo().get(), true ) );
-        }
-
-        if ( property.isUnwrapped() ) {
-            paramBuilder.add( "\n.setUnwrapped(true)" );
-        }
-
-        paramBuilder.add( ";\n" )
-                .unindent()
-                .unindent();
-
-        return Optional.of( MethodSpec.methodBuilder( "newParameters" )
-                .addModifiers( Modifier.PROTECTED )
-                .addAnnotation( Override.class )
-                .returns( JsonSerializerParameters.class )
-                .addCode( paramBuilder.build() )
-                .build() );
     }
 }

@@ -22,7 +22,7 @@ import com.google.gwt.thirdparty.guava.common.collect.ImmutableList;
 import com.squareup.javapoet.CodeBlock;
 
 /**
- * Contains informations about deserializer like its type or the string to instantiate it.
+ * Contains informations about deserializer like its type or the code to instantiate it.
  *
  * @author Nicolas Morel
  */

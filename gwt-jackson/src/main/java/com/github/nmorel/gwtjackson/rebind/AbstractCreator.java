@@ -21,14 +21,12 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.Iterator;
 
-import com.github.nmorel.gwtjackson.client.JsonDeserializer;
 import com.github.nmorel.gwtjackson.client.JsonSerializer;
 import com.github.nmorel.gwtjackson.client.deser.EnumJsonDeserializer;
 import com.github.nmorel.gwtjackson.client.deser.array.ArrayJsonDeserializer;
 import com.github.nmorel.gwtjackson.client.deser.array.ArrayJsonDeserializer.ArrayCreator;
 import com.github.nmorel.gwtjackson.client.deser.array.dd.Array2dJsonDeserializer;
 import com.github.nmorel.gwtjackson.client.deser.array.dd.Array2dJsonDeserializer.Array2dCreator;
-import com.github.nmorel.gwtjackson.client.deser.bean.AbstractBeanJsonDeserializer;
 import com.github.nmorel.gwtjackson.client.deser.map.key.EnumKeyDeserializer;
 import com.github.nmorel.gwtjackson.client.deser.map.key.KeyDeserializer;
 import com.github.nmorel.gwtjackson.client.ser.EnumJsonSerializer;
@@ -43,7 +41,6 @@ import com.github.nmorel.gwtjackson.rebind.exception.UnsupportedTypeException;
 import com.github.nmorel.gwtjackson.rebind.type.JDeserializerType;
 import com.github.nmorel.gwtjackson.rebind.type.JMapperType;
 import com.github.nmorel.gwtjackson.rebind.type.JSerializerType;
-import com.github.nmorel.gwtjackson.rebind.writer.JClassName;
 import com.google.gwt.core.ext.GeneratorContext;
 import com.google.gwt.core.ext.TreeLogger;
 import com.google.gwt.core.ext.TreeLogger.Type;
@@ -62,8 +59,11 @@ import com.squareup.javapoet.ClassName;
 import com.squareup.javapoet.CodeBlock;
 import com.squareup.javapoet.JavaFile;
 import com.squareup.javapoet.MethodSpec;
-import com.squareup.javapoet.ParameterizedTypeName;
 import com.squareup.javapoet.TypeSpec;
+
+import static com.github.nmorel.gwtjackson.rebind.writer.JTypeName.parameterizedName;
+import static com.github.nmorel.gwtjackson.rebind.writer.JTypeName.rawName;
+import static com.github.nmorel.gwtjackson.rebind.writer.JTypeName.typeName;
 
 /**
  * @author Nicolas Morel
@@ -90,14 +90,30 @@ public abstract class AbstractCreator extends AbstractSourceCreator {
         this.typeOracle = typeOracle;
     }
 
+    /**
+     * Creates the {@link PrintWriter} to write the class.
+     *
+     * @param packageName the package
+     * @param className the name of the class
+     *
+     * @return the {@link PrintWriter} or null if the class already exists.
+     */
     protected PrintWriter getPrintWriter( String packageName, String className ) {
         return context.tryCreate( logger, packageName, className );
     }
 
+    /**
+     * Writes the given type to the {@link PrintWriter}.
+     *
+     * @param packageName the package for the type
+     * @param type the type
+     * @param printWriter the writer
+     *
+     * @throws UnableToCompleteException if an exception is thrown by the writer
+     */
     protected void write( String packageName, TypeSpec type, PrintWriter printWriter ) throws UnableToCompleteException {
         try {
             JavaFile.builder( packageName, type )
-                    .skipJavaLangImports( true )
                     .build()
                     .writeTo( printWriter );
             context.commit( logger, printWriter );
@@ -110,13 +126,12 @@ public abstract class AbstractCreator extends AbstractSourceCreator {
     protected abstract Optional<BeanJsonMapperInfo> getMapperInfo();
 
     /**
-     * Build the string that instantiate a {@link JsonSerializer} for the given type. If the type is a bean,
-     * the implementation of {@link AbstractBeanJsonSerializer} will
-     * be created.
+     * Build a {@link JSerializerType} that instantiate a {@link JsonSerializer} for the given type. If the type is a bean,
+     * the implementation of {@link AbstractBeanJsonSerializer} will be created.
      *
      * @param type type
      *
-     * @return the code instantiating the {@link JsonSerializer}. Examples:
+     * @return the {@link JSerializerType}. Examples:
      * <ul>
      * <li>ctx.getIntegerSerializer()</li>
      * <li>new org.PersonBeanJsonSerializer()</li>
@@ -127,44 +142,50 @@ public abstract class AbstractCreator extends AbstractSourceCreator {
     }
 
     /**
-     * Build the string that instantiate a {@link JsonSerializer} for the given type. If the type is a bean,
-     * the implementation of {@link AbstractBeanJsonSerializer} will
-     * be created.
+     * Build a {@link JSerializerType} that instantiate a {@link JsonSerializer} for the given type. If the type is a bean,
+     * the implementation of {@link AbstractBeanJsonSerializer} will be created.
      *
      * @param type type
      * @param subtype true if the serializer is for a subtype
      *
-     * @return the code instantiating the {@link JsonSerializer}. Examples:
+     * @return the {@link JSerializerType}. Examples:
      * <ul>
      * <li>ctx.getIntegerSerializer()</li>
      * <li>new org.PersonBeanJsonSerializer()</li>
      * </ul>
      */
-    protected JSerializerType getJsonSerializerFromType( JType type, boolean subtype ) throws UnableToCompleteException,
-            UnsupportedTypeException {
+    protected JSerializerType getJsonSerializerFromType( JType type, boolean subtype )
+            throws UnableToCompleteException, UnsupportedTypeException {
+
         JSerializerType.Builder builder = new JSerializerType.Builder().type( type );
         if ( null != type.isWildcard() ) {
-            // we use the base type to find the serializer to use
+            // For wildcard type, we use the base type to find the serializer.
             type = type.isWildcard().getBaseType();
         }
 
         if ( null != type.isRawType() ) {
+            // For raw type, we use the base type to find the serializer.
             type = type.isRawType().getBaseType();
         }
 
         JTypeParameter typeParameter = type.isTypeParameter();
         if ( null != typeParameter ) {
+            // It's a type parameter like T in 'MyClass<T>'
             if ( !subtype || typeParameter.getDeclaringClass() == getMapperInfo().get().getType() ) {
-                return builder.instance( CodeBlock.builder().add( String.format( TYPE_PARAMETER_SERIALIZER_FIELD_NAME, typeParameter
-                        .getOrdinal() ) )
-                        .build() ).build();
+                // The serializer is created for the main type so we use the serializer field declared for this type.
+                return builder.instance( CodeBlock.builder()
+                        .add( String.format( TYPE_PARAMETER_SERIALIZER_FIELD_NAME, typeParameter.getOrdinal() ) )
+                        .build() )
+                        .build();
             } else {
+                // There is no declared serializer so we use the base type to find a serializer.
                 type = typeParameter.getBaseType();
             }
         }
 
         Optional<MapperInstance> configuredSerializer = configuration.getSerializer( type );
         if ( configuredSerializer.isPresent() ) {
+            // The type is configured in AbstractConfiguration.
             if ( null != type.isParameterized() || null != type.isGenericType() ) {
                 JClassType[] typeArgs;
                 if ( null != type.isGenericType() ) {
@@ -188,13 +209,14 @@ public abstract class AbstractCreator extends AbstractSourceCreator {
                 builder.instance( methodCallCode( configuredSerializer.get(), parametersSerializer ) );
 
             } else {
+                // The serializer has no parameters.
                 builder.instance( methodCallCode( configuredSerializer.get() ) );
             }
             return builder.build();
         }
 
         if ( typeOracle.isJavaScriptObject( type ) ) {
-            // it's a JSO and the user didn't give a custom serializer. We use the default one.
+            // It's a JSO and the user didn't give a custom serializer. We use the default one.
             configuredSerializer = configuration.getSerializer( typeOracle.getJavaScriptObject() );
             return builder.instance( methodCallCode( configuredSerializer.get() ) ).build();
         }
@@ -202,8 +224,9 @@ public abstract class AbstractCreator extends AbstractSourceCreator {
         JEnumType enumType = type.isEnum();
         if ( null != enumType ) {
             return builder.instance( CodeBlock.builder()
-                    .add( "$T.<$T<$T>>getInstance()", EnumJsonSerializer.class, EnumJsonSerializer.class, JClassName.get( enumType ) )
-                    .build() ).build();
+                    .add( "$T.<$T<$T>>getInstance()", EnumJsonSerializer.class, EnumJsonSerializer.class, typeName( enumType ) )
+                    .build() )
+                    .build();
         }
 
         if ( Enum.class.getName().equals( type.getQualifiedSourceName() ) ) {
@@ -214,21 +237,21 @@ public abstract class AbstractCreator extends AbstractSourceCreator {
         if ( null != arrayType ) {
             Class arraySerializer;
             if ( arrayType.getRank() == 1 ) {
-                // one dimension array
+                // One dimension array
                 arraySerializer = ArrayJsonSerializer.class;
             } else if ( arrayType.getRank() == 2 ) {
-                // two dimension array
+                // Two dimension array
                 arraySerializer = Array2dJsonSerializer.class;
             } else {
-                // more dimensions are not supported
+                // More dimensions are not supported
                 String message = "Arrays with 3 or more dimensions are not supported";
                 logger.log( TreeLogger.Type.WARN, message );
                 throw new UnsupportedTypeException( message );
             }
             JSerializerType parameterSerializerType = getJsonSerializerFromType( arrayType.getLeafType(), subtype );
             builder.parameters( ImmutableList.of( parameterSerializerType ) );
-            builder.instance( CodeBlock.builder().add( "$T.newInstance($L)", arraySerializer, parameterSerializerType
-                    .getInstance() )
+            builder.instance( CodeBlock.builder()
+                    .add( "$T.newInstance($L)", arraySerializer, parameterSerializerType.getInstance() )
                     .build() );
             return builder.build();
         }
@@ -241,19 +264,20 @@ public abstract class AbstractCreator extends AbstractSourceCreator {
 
         JClassType classType = type.isClassOrInterface();
         if ( null != classType ) {
-            // it's a bean
+            // The type is a class or interface and has no default serializer. We generate one.
             JClassType baseClassType = classType;
             JParameterizedType parameterizedType = classType.isParameterized();
             if ( null != parameterizedType ) {
-                // it's a bean with generics, we create a serializer based on generic type
+                // It's a bean with generics, we create a serializer based on generic type.
                 baseClassType = parameterizedType.getBaseType();
             }
 
-            BeanJsonSerializerCreator beanJsonSerializerCreator = new BeanJsonSerializerCreator( logger
-                    .branch( Type.DEBUG, "Creating serializer for " + baseClassType
-                            .getQualifiedSourceName() ), context, configuration, typeOracle, baseClassType );
+            BeanJsonSerializerCreator beanJsonSerializerCreator = new BeanJsonSerializerCreator(
+                    logger.branch( Type.DEBUG, "Creating serializer for " + baseClassType.getQualifiedSourceName() ),
+                    context, configuration, typeOracle, baseClassType );
             BeanJsonMapperInfo mapperInfo = beanJsonSerializerCreator.create();
 
+            // Generics and parameterized types serializers have no default constructor. They need serializers for each parameter.
             ImmutableList<? extends JType> typeParameters = getTypeParameters( classType, subtype );
             ImmutableList.Builder<JSerializerType> parametersSerializerBuilder = ImmutableList.builder();
             for ( JType argType : typeParameters ) {
@@ -263,8 +287,8 @@ public abstract class AbstractCreator extends AbstractSourceCreator {
 
             builder.parameters( parametersSerializer );
             builder.beanMapper( true );
-            builder.instance( constructorCallCode( ClassName.get( mapperInfo.getPackageName(), mapperInfo
-                    .getSimpleSerializerClassName() ), parametersSerializer ) );
+            builder.instance( constructorCallCode(
+                    ClassName.get( mapperInfo.getPackageName(), mapperInfo.getSimpleSerializerClassName() ), parametersSerializer ) );
             return builder.build();
         }
 
@@ -274,17 +298,22 @@ public abstract class AbstractCreator extends AbstractSourceCreator {
     }
 
     /**
-     * Build the string that instantiate a {@link KeySerializer} for the given type.
+     * Build the {@link JSerializerType} that instantiate a {@link KeySerializer} for the given type.
      *
      * @param type type
      *
-     * @return the code instantiating the {@link KeySerializer}.
+     * @return the {@link JSerializerType}.
      */
     protected JSerializerType getKeySerializerFromType( JType type ) throws UnsupportedTypeException {
         JSerializerType.Builder builder = new JSerializerType.Builder().type( type );
         if ( null != type.isWildcard() ) {
-            // we use the base type to find the serializer to use
+            // For wildcard type, we use the base type to find the serializer.
             type = type.isWildcard().getBaseType();
+        }
+
+        if ( null != type.isRawType() ) {
+            // For raw type, we use the base type to find the serializer.
+            type = type.isRawType().getBaseType();
         }
 
         Optional<MapperInstance> keySerializer = configuration.getKeySerializer( type );
@@ -296,7 +325,7 @@ public abstract class AbstractCreator extends AbstractSourceCreator {
         JEnumType enumType = type.isEnum();
         if ( null != enumType ) {
             builder.instance( CodeBlock.builder()
-                    .add( "$T.<$T<$T>>getInstance()", EnumKeySerializer.class, EnumKeySerializer.class, JClassName.get( enumType ) )
+                    .add( "$T.<$T<$T>>getInstance()", EnumKeySerializer.class, EnumKeySerializer.class, typeName( enumType ) )
                     .build() );
             return builder.build();
         }
@@ -311,13 +340,12 @@ public abstract class AbstractCreator extends AbstractSourceCreator {
     }
 
     /**
-     * Build the string that instantiate a {@link JsonDeserializer} for the given type. If the type is a bean,
-     * the implementation of {@link AbstractBeanJsonDeserializer} will
-     * be created.
+     * Build a {@link JDeserializerType} that instantiate a {@link JsonSerializer} for the given type. If the type is a bean,
+     * the implementation of {@link AbstractBeanJsonSerializer} will be created.
      *
      * @param type type
      *
-     * @return the code instantiating the deserializer. Examples:
+     * @return the {@link JDeserializerType}. Examples:
      * <ul>
      * <li>ctx.getIntegerDeserializer()</li>
      * <li>new org .PersonBeanJsonDeserializer()</li>
@@ -328,14 +356,13 @@ public abstract class AbstractCreator extends AbstractSourceCreator {
     }
 
     /**
-     * Build the string that instantiate a {@link JsonDeserializer} for the given type. If the type is a bean,
-     * the implementation of {@link AbstractBeanJsonDeserializer} will
-     * be created.
+     * Build a {@link JDeserializerType} that instantiate a {@link JsonSerializer} for the given type. If the type is a bean,
+     * the implementation of {@link AbstractBeanJsonSerializer} will be created.
      *
      * @param type type
      * @param subtype true if the deserializer is for a subtype
      *
-     * @return the code instantiating the deserializer. Examples:
+     * @return the {@link JDeserializerType}. Examples:
      * <ul>
      * <li>ctx.getIntegerDeserializer()</li>
      * <li>new org .PersonBeanJsonDeserializer()</li>
@@ -345,27 +372,33 @@ public abstract class AbstractCreator extends AbstractSourceCreator {
             UnsupportedTypeException {
         JDeserializerType.Builder builder = new JDeserializerType.Builder().type( type );
         if ( null != type.isWildcard() ) {
-            // we use the base type to find the deserializer to use
+            // For wildcard type, we use the base type to find the deserializer.
             type = type.isWildcard().getBaseType();
         }
 
         if ( null != type.isRawType() ) {
+            // For raw type, we use the base type to find the deserializer.
             type = type.isRawType().getBaseType();
         }
 
         JTypeParameter typeParameter = type.isTypeParameter();
         if ( null != typeParameter ) {
+            // It's a type parameter like T in 'MyClass<T>'
             if ( !subtype || typeParameter.getDeclaringClass() == getMapperInfo().get().getType() ) {
-                return builder.instance( CodeBlock.builder().add( String.format( TYPE_PARAMETER_DESERIALIZER_FIELD_NAME, typeParameter
-                        .getOrdinal() ) )
-                        .build() ).build();
+                // The deserializer is created for the main type so we use the deserializer field declared for this type.
+                return builder.instance( CodeBlock.builder()
+                        .add( String.format( TYPE_PARAMETER_DESERIALIZER_FIELD_NAME, typeParameter.getOrdinal() ) )
+                        .build() )
+                        .build();
             } else {
+                // There is no declared deserializer so we use the base type to find a deserializer.
                 type = typeParameter.getBaseType();
             }
         }
 
         Optional<MapperInstance> configuredDeserializer = configuration.getDeserializer( type );
         if ( configuredDeserializer.isPresent() ) {
+            // The type is configured in AbstractConfiguration.
             if ( null != type.isParameterized() || null != type.isGenericType() ) {
                 JClassType[] typeArgs;
                 if ( null != type.isGenericType() ) {
@@ -389,21 +422,24 @@ public abstract class AbstractCreator extends AbstractSourceCreator {
                 builder.instance( methodCallCode( configuredDeserializer.get(), parametersDeserializer ) );
 
             } else {
+                // The deserializer has no parameters.
                 builder.instance( methodCallCode( configuredDeserializer.get() ) );
             }
             return builder.build();
         }
 
         if ( typeOracle.isJavaScriptObject( type ) ) {
-            // it's a JSO and the user didn't give a custom deserializer. We use the default one.
+            // It's a JSO and the user didn't give a custom deserializer. We use the default one.
             configuredDeserializer = configuration.getDeserializer( typeOracle.getJavaScriptObject() );
             return builder.instance( methodCallCode( configuredDeserializer.get() ) ).build();
         }
 
         JEnumType enumType = type.isEnum();
         if ( null != enumType ) {
-            return builder.instance( CodeBlock.builder().add( "$T.newInstance($T.class)", EnumJsonDeserializer.class, JClassName
-                    .get( enumType ) ).build() ).build();
+            return builder.instance( CodeBlock.builder()
+                    .add( "$T.newInstance($T.class)", EnumJsonDeserializer.class, typeName( enumType ) )
+                    .build() )
+                    .build();
         }
 
         if ( Enum.class.getName().equals( type.getQualifiedSourceName() ) ) {
@@ -419,36 +455,36 @@ public abstract class AbstractCreator extends AbstractSourceCreator {
             JType leafType = arrayType.getLeafType();
 
             if ( arrayType.getRank() == 1 ) {
-                // one dimension array
+                // One dimension array
                 arrayCreator = TypeSpec.anonymousClassBuilder( "" )
-                        .addSuperinterface( ParameterizedTypeName.get( ClassName.get( ArrayCreator.class ), JClassName.get( leafType ) ) )
+                        .addSuperinterface( parameterizedName( ArrayCreator.class, leafType ) )
                         .addMethod( MethodSpec.methodBuilder( "create" )
                                 .addAnnotation( Override.class )
                                 .addModifiers( Modifier.PUBLIC )
                                 .addParameter( int.class, "length" )
-                                .addStatement( "return new $T[$N]", JClassName.getRaw( leafType ), "length" )
-                                .returns( JClassName.get( arrayType ) )
+                                .addStatement( "return new $T[$N]", rawName( leafType ), "length" )
+                                .returns( typeName( arrayType ) )
                                 .build() )
                         .build();
                 arrayDeserializer = ArrayJsonDeserializer.class;
 
             } else if ( arrayType.getRank() == 2 ) {
-                // 2 dimensions array
+                // Two dimensions array
                 arrayCreator = TypeSpec.anonymousClassBuilder( "" )
-                        .addSuperinterface( ParameterizedTypeName.get( ClassName.get( Array2dCreator.class ), JClassName.get( leafType ) ) )
+                        .addSuperinterface( parameterizedName( Array2dCreator.class, leafType ) )
                         .addMethod( MethodSpec.methodBuilder( "create" )
                                 .addAnnotation( Override.class )
                                 .addModifiers( Modifier.PUBLIC )
                                 .addParameter( int.class, "first" )
                                 .addParameter( int.class, "second" )
-                                .addStatement( "return new $T[$N][$N]", JClassName.getRaw( leafType ), "first", "second" )
-                                .returns( JClassName.get( arrayType ) )
+                                .addStatement( "return new $T[$N][$N]", rawName( leafType ), "first", "second" )
+                                .returns( typeName( arrayType ) )
                                 .build() )
                         .build();
                 arrayDeserializer = Array2dJsonDeserializer.class;
 
             } else {
-                // more dimensions are not supported
+                // More dimensions are not supported
                 String message = "Arrays with 3 or more dimensions are not supported";
                 logger.log( TreeLogger.Type.WARN, message );
                 throw new UnsupportedTypeException( message );
@@ -469,19 +505,20 @@ public abstract class AbstractCreator extends AbstractSourceCreator {
 
         JClassType classType = type.isClassOrInterface();
         if ( null != classType ) {
-            // it's a bean
+            // The type is a class or interface and has no default deserializer. We generate one.
             JClassType baseClassType = classType;
             JParameterizedType parameterizedType = classType.isParameterized();
             if ( null != parameterizedType ) {
-                // it's a bean with generics, we create a deserializer based on generic type
+                // It's a bean with generics, we create a deserializer based on generic type.
                 baseClassType = parameterizedType.getBaseType();
             }
 
-            BeanJsonDeserializerCreator beanJsonDeserializerCreator = new BeanJsonDeserializerCreator( logger
-                    .branch( Type.DEBUG, "Creating deserializer for " + baseClassType
-                            .getQualifiedSourceName() ), context, configuration, typeOracle, baseClassType );
+            BeanJsonDeserializerCreator beanJsonDeserializerCreator = new BeanJsonDeserializerCreator(
+                    logger.branch( Type.DEBUG, "Creating deserializer for " + baseClassType.getQualifiedSourceName() ),
+                    context, configuration, typeOracle, baseClassType );
             BeanJsonMapperInfo mapperInfo = beanJsonDeserializerCreator.create();
 
+            // Generics and parameterized types deserializers have no default constructor. They need deserializers for each parameter.
             ImmutableList<? extends JType> typeParameters = getTypeParameters( classType, subtype );
             ImmutableList.Builder<JDeserializerType> parametersDeserializerBuilder = ImmutableList.builder();
             for ( JType argType : typeParameters ) {
@@ -491,8 +528,8 @@ public abstract class AbstractCreator extends AbstractSourceCreator {
 
             builder.parameters( parametersDeserializer );
             builder.beanMapper( true );
-            builder.instance( constructorCallCode( ClassName.get( mapperInfo.getPackageName(), mapperInfo
-                    .getSimpleDeserializerClassName() ), parametersDeserializer ) );
+            builder.instance( constructorCallCode(
+                    ClassName.get( mapperInfo.getPackageName(), mapperInfo.getSimpleDeserializerClassName() ), parametersDeserializer ) );
             return builder.build();
         }
 
@@ -502,17 +539,22 @@ public abstract class AbstractCreator extends AbstractSourceCreator {
     }
 
     /**
-     * Build the string that instantiate a {@link KeyDeserializer} for the given type.
+     * Build the {@link JDeserializerType} that instantiate a {@link KeyDeserializer} for the given type.
      *
      * @param type type
      *
-     * @return the code instantiating the {@link KeyDeserializer}.
+     * @return the {@link JDeserializerType}.
      */
     protected JDeserializerType getKeyDeserializerFromType( JType type ) throws UnsupportedTypeException {
         JDeserializerType.Builder builder = new JDeserializerType.Builder().type( type );
         if ( null != type.isWildcard() ) {
-            // we use the base type to find the serializer to use
+            // For wildcard type, we use the base type to find the deserializer.
             type = type.isWildcard().getBaseType();
+        }
+
+        if ( null != type.isRawType() ) {
+            // For raw type, we use the base type to find the deserializer.
+            type = type.isRawType().getBaseType();
         }
 
         Optional<MapperInstance> keyDeserializer = configuration.getKeyDeserializer( type );
@@ -523,7 +565,8 @@ public abstract class AbstractCreator extends AbstractSourceCreator {
 
         JEnumType enumType = type.isEnum();
         if ( null != enumType ) {
-            builder.instance( CodeBlock.builder().add( "$T.newInstance($T.class)", EnumKeyDeserializer.class, JClassName.get( enumType ) )
+            builder.instance( CodeBlock.builder()
+                    .add( "$T.newInstance($T.class)", EnumKeyDeserializer.class, typeName( enumType ) )
                     .build() );
             return builder.build();
         }
@@ -588,27 +631,58 @@ public abstract class AbstractCreator extends AbstractSourceCreator {
         return ImmutableList.of();
     }
 
+    /**
+     * Build the code to call the constructor of a class
+     *
+     * @param className the class to call
+     * @param parameters the parameters of the constructor
+     *
+     * @return the code calling the constructor
+     */
     private CodeBlock constructorCallCode( ClassName className, ImmutableList<? extends JMapperType> parameters ) {
         CodeBlock.Builder builder = CodeBlock.builder();
         builder.add( "new $T", className );
-        return methodCallCode( builder, parameters );
+        return methodCallParametersCode( builder, parameters );
     }
 
+    /**
+     * Build the code to create a mapper.
+     *
+     * @param instance the class to call
+     *
+     * @return the code to create the mapper
+     */
     private CodeBlock methodCallCode( MapperInstance instance ) {
         return methodCallCode( instance, ImmutableList.<JMapperType>of() );
     }
 
+    /**
+     * Build the code to create a mapper.
+     *
+     * @param instance the class to call
+     * @param parameters the parameters of the method
+     *
+     * @return the code to create the mapper
+     */
     private CodeBlock methodCallCode( MapperInstance instance, ImmutableList<? extends JMapperType> parameters ) {
         CodeBlock.Builder builder = CodeBlock.builder();
         if ( null == instance.getInstanceCreationMethod().isConstructor() ) {
-            builder.add( "$T.$L", JClassName.getRaw( instance.getMapperType() ), instance.getInstanceCreationMethod().getName() );
+            builder.add( "$T.$L", rawName( instance.getMapperType() ), instance.getInstanceCreationMethod().getName() );
         } else {
-            builder.add( "new $T", JClassName.get( instance.getMapperType() ) );
+            builder.add( "new $T", typeName( instance.getMapperType() ) );
         }
-        return methodCallCode( builder, parameters );
+        return methodCallParametersCode( builder, parameters );
     }
 
-    private CodeBlock methodCallCode( CodeBlock.Builder builder, ImmutableList<? extends JMapperType> parameters ) {
+    /**
+     * Build the code for the parameters of a method call.
+     *
+     * @param builder the code builder
+     * @param parameters the parameters
+     *
+     * @return the code
+     */
+    private CodeBlock methodCallParametersCode( CodeBlock.Builder builder, ImmutableList<? extends JMapperType> parameters ) {
         if ( parameters.isEmpty() ) {
             return builder.add( "()" ).build();
         }
