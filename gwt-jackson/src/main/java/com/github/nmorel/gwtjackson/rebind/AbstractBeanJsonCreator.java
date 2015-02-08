@@ -93,14 +93,8 @@ public abstract class AbstractBeanJsonCreator extends AbstractCreator {
     protected static final String ABSTRACT_BEAN_JSON_DESERIALIZER_CLASS = "com.github.nmorel.gwtjackson.client.deser.bean" + "" +
             ".AbstractBeanJsonDeserializer";
 
-    protected static final String ABSTRACT_BEAN_JSON_SERIALIZER_CLASS = "com.github.nmorel.gwtjackson.client.ser.bean" + "" +
-            ".AbstractBeanJsonSerializer";
-
     protected static final String TYPE_DESERIALIZATION_INFO_CLASS = "com.github.nmorel.gwtjackson.client.deser.bean" + "" +
             ".TypeDeserializationInfo";
-
-    protected static final String TYPE_SERIALIZATION_INFO_CLASS = "com.github.nmorel.gwtjackson.client.ser.bean" + "" +
-            ".TypeSerializationInfo";
 
     protected final BeanJsonMapperInfo mapperInfo;
 
@@ -320,7 +314,7 @@ public abstract class AbstractBeanJsonCreator extends AbstractCreator {
 
             builder.superclass( JClassName.get( PropertyIdentitySerializationInfo.class, type, propertyInfo.getType() ) );
 
-            generateBeanPropertySerializerBody( builder, type, propertyInfo, propertySerializerType );
+            buildBeanPropertySerializerBody( builder, type, propertyInfo, propertySerializerType );
 
         } else {
             JType qualifiedType = identityInfo.getType().get();
@@ -398,7 +392,7 @@ public abstract class AbstractBeanJsonCreator extends AbstractCreator {
         }
     }
 
-    protected CodeBlock generateTypeInfo( BeanTypeInfo typeInfo, boolean serialization ) throws UnableToCompleteException {
+    protected CodeBlock generateTypeInfo( BeanTypeInfo typeInfo, boolean serialization ) {
         CodeBlock.Builder builder = CodeBlock.builder()
                 .add( "new $T($T.$L, $S)", serialization ? TypeSerializationInfo.class : TypeDeserializationInfo.class,
                         As.class, typeInfo.getInclude(), typeInfo.getPropertyName() )
@@ -440,8 +434,7 @@ public abstract class AbstractBeanJsonCreator extends AbstractCreator {
         return findFirstTypeToApplyPropertyAnnotation( subLevel );
     }
 
-    protected void generateCommonPropertyParameters( CodeBlock.Builder paramBuilder, PropertyInfo property ) throws
-            UnableToCompleteException {
+    protected void generateCommonPropertyParameters( CodeBlock.Builder paramBuilder, PropertyInfo property ) {
         if ( property.getFormat().isPresent() ) {
             JsonFormat format = property.getFormat().get();
 
@@ -472,7 +465,7 @@ public abstract class AbstractBeanJsonCreator extends AbstractCreator {
         }
     }
 
-    protected void generateBeanPropertySerializerBody( TypeSpec.Builder builder, JClassType beanType, PropertyInfo property, JSerializerType
+    protected void buildBeanPropertySerializerBody( TypeSpec.Builder builder, JClassType beanType, PropertyInfo property, JSerializerType
             serializerType ) throws UnableToCompleteException {
         String paramName = "bean";
         Accessor getterAccessor = property.getGetterAccessor().get().getAccessor( paramName );
@@ -497,8 +490,7 @@ public abstract class AbstractBeanJsonCreator extends AbstractCreator {
         builder.addMethod( MethodSpec.methodBuilder( "getValue" )
                         .addModifiers( Modifier.PUBLIC )
                         .addAnnotation( Override.class )
-                        // the boxed type is specified so we can't return a primitive
-                        .returns( JClassName.get( true, property.getType() ) )
+                        .returns( JClassName.get( true, property.getType() ) ) // the boxed type is specified so we can't return a primitive
                         .addParameter( JClassName.get( beanType ), paramName )
                         .addParameter( JsonSerializationContext.class, "ctx" )
                         .addStatement( "return $L", getterAccessor.getAccessor() )
