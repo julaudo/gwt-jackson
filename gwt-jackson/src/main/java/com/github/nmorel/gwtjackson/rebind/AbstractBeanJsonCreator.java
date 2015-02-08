@@ -275,14 +275,6 @@ public abstract class AbstractBeanJsonCreator extends AbstractCreator {
 
     protected abstract void buildSpecific() throws UnableToCompleteException, UnsupportedTypeException;
 
-    protected String getParameterizedQualifiedClassName( JType type ) {
-        if ( null == type.isPrimitive() ) {
-            return type.getParameterizedQualifiedSourceName();
-        } else {
-            return type.isPrimitive().getQualifiedBoxedSourceName();
-        }
-    }
-
     protected Optional<JSerializerType> getIdentitySerializerType( BeanIdentityInfo identityInfo ) throws UnableToCompleteException,
             UnsupportedTypeException {
         if ( identityInfo.isIdABeanProperty() ) {

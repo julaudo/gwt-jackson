@@ -70,14 +70,6 @@ import com.squareup.javapoet.TypeSpec;
  */
 public abstract class AbstractCreator extends AbstractSourceCreator {
 
-    protected static final String JSON_DESERIALIZER_CLASS = "com.github.nmorel.gwtjackson.client.JsonDeserializer";
-
-    protected static final String JSON_SERIALIZER_CLASS = "com.github.nmorel.gwtjackson.client.JsonSerializer";
-
-    protected static final String JSON_DESERIALIZATION_CONTEXT_CLASS = "com.github.nmorel.gwtjackson.client.JsonDeserializationContext";
-
-    protected static final String JSON_SERIALIZATION_CONTEXT_CLASS = "com.github.nmorel.gwtjackson.client.JsonSerializationContext";
-
     protected static final String TYPE_PARAMETER_DESERIALIZER_FIELD_NAME = "deserializer%d";
 
     protected static final String TYPE_PARAMETER_SERIALIZER_FIELD_NAME = "serializer%d";
@@ -594,10 +586,6 @@ public abstract class AbstractCreator extends AbstractSourceCreator {
         }
 
         return ImmutableList.of();
-    }
-
-    private CodeBlock constructorCallCode( ClassName className ) {
-        return constructorCallCode( className, ImmutableList.<JMapperType>of() );
     }
 
     private CodeBlock constructorCallCode( ClassName className, ImmutableList<? extends JMapperType> parameters ) {

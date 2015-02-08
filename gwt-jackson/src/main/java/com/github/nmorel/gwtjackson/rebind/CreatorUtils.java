@@ -16,7 +16,6 @@
 
 package com.github.nmorel.gwtjackson.rebind;
 
-import javax.annotation.Nullable;
 import java.io.Serializable;
 import java.lang.annotation.Annotation;
 import java.util.List;
@@ -27,7 +26,6 @@ import com.google.gwt.core.ext.typeinfo.HasAnnotations;
 import com.google.gwt.core.ext.typeinfo.JClassType;
 import com.google.gwt.core.ext.typeinfo.JPrimitiveType;
 import com.google.gwt.core.ext.typeinfo.JType;
-import com.google.gwt.thirdparty.guava.common.base.Function;
 import com.google.gwt.thirdparty.guava.common.base.Optional;
 import com.google.gwt.thirdparty.guava.common.collect.ImmutableList;
 
@@ -35,16 +33,6 @@ import com.google.gwt.thirdparty.guava.common.collect.ImmutableList;
  * @author Nicolas Morel
  */
 public final class CreatorUtils {
-
-    public static final Function<Object, String> QUOTED_FUNCTION = new Function<Object, String>() {
-        @Override
-        public String apply( @Nullable Object o ) {
-            if ( null == o ) {
-                return null;
-            }
-            return "\"" + o + "\"";
-        }
-    };
 
     /**
      * Browse all the hierarchy of the type and return the first corresponding annotation it found
