@@ -18,13 +18,11 @@ package com.github.nmorel.gwtjackson.rebind;
 
 import javax.lang.model.element.Modifier;
 import java.io.PrintWriter;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
 import java.util.Map.Entry;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonFormat.Shape;
+import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.annotation.JsonTypeInfo.As;
 import com.github.nmorel.gwtjackson.client.JsonDeserializer;
 import com.github.nmorel.gwtjackson.client.JsonSerializer;
@@ -37,13 +35,9 @@ import com.github.nmorel.gwtjackson.client.ser.bean.AbstractBeanJsonSerializer;
 import com.github.nmorel.gwtjackson.client.ser.bean.AbstractValueBeanJsonSerializer;
 import com.github.nmorel.gwtjackson.client.ser.bean.TypeSerializationInfo;
 import com.github.nmorel.gwtjackson.rebind.bean.BeanInfo;
-import com.github.nmorel.gwtjackson.rebind.bean.BeanProcessor;
 import com.github.nmorel.gwtjackson.rebind.bean.BeanTypeInfo;
 import com.github.nmorel.gwtjackson.rebind.exception.UnsupportedTypeException;
-import com.github.nmorel.gwtjackson.rebind.property.PropertiesContainer;
 import com.github.nmorel.gwtjackson.rebind.property.PropertyInfo;
-import com.github.nmorel.gwtjackson.rebind.property.processor.PropertyProcessor;
-import com.github.nmorel.gwtjackson.rebind.type.JMapperType;
 import com.google.gwt.core.ext.GeneratorContext;
 import com.google.gwt.core.ext.TreeLogger;
 import com.google.gwt.core.ext.TreeLogger.Type;
@@ -79,65 +73,16 @@ public abstract class AbstractBeanJsonCreator extends AbstractCreator {
 
     protected final ImmutableMap<String, PropertyInfo> properties;
 
-    protected TypeSpec.Builder typeBuilder;
-
     public AbstractBeanJsonCreator( TreeLogger logger, GeneratorContext context, RebindConfiguration configuration, JacksonTypeOracle
             typeOracle, JClassType beanType ) throws UnableToCompleteException {
         super( logger, context, configuration, typeOracle );
-        this.mapperInfo = initMapperInfo( beanType );
+        this.mapperInfo = getMapperInfo( beanType );
         this.beanInfo = mapperInfo.getBeanInfo();
         this.properties = mapperInfo.getProperties();
     }
 
-    private BeanJsonMapperInfo initMapperInfo( JClassType beanType ) throws UnableToCompleteException {
-        BeanJsonMapperInfo mapperInfo = typeOracle.getBeanJsonMapperInfo( beanType );
-        if ( null != mapperInfo ) {
-            return mapperInfo;
-        }
-
-        boolean samePackage = true;
-        String packageName = beanType.getPackage().getName();
-        if ( packageName.startsWith( "java." ) ) {
-            packageName = "gwtjackson." + packageName;
-            samePackage = false;
-        }
-
-        // retrieve the informations on the beans and its properties
-        BeanInfo beanInfo = BeanProcessor.processBean( logger, typeOracle, configuration, beanType );
-        PropertiesContainer properties = PropertyProcessor
-                .findAllProperties( configuration, logger, typeOracle, beanInfo, samePackage );
-        beanInfo = BeanProcessor.processProperties( configuration, logger, typeOracle, beanInfo, properties );
-
-        // we concatenate the name of all the enclosing class
-        StringBuilder builder = new StringBuilder( beanType.getSimpleSourceName() );
-        JClassType enclosingType = beanType.getEnclosingType();
-        while ( null != enclosingType ) {
-            builder.insert( 0, enclosingType.getSimpleSourceName() + "_" );
-            enclosingType = enclosingType.getEnclosingType();
-        }
-
-        // if the type is specific to the mapper, we concatenate the name and hash of the mapper to it
-        boolean isSpecificToMapper = configuration.isSpecificToMapper( beanType );
-        if ( isSpecificToMapper ) {
-            JClassType rootMapperClass = configuration.getRootMapperClass();
-            builder.insert( 0, '_' ).insert( 0, configuration.getRootMapperHash() ).insert( 0, '_' ).insert( 0, rootMapperClass
-                    .getSimpleSourceName() );
-        }
-
-        String simpleSerializerClassName = builder.toString() + "BeanJsonSerializerImpl";
-        String simpleDeserializerClassName = builder.toString() + "BeanJsonDeserializerImpl";
-
-        mapperInfo = new BeanJsonMapperInfo( beanType, packageName, samePackage, simpleSerializerClassName,
-                simpleDeserializerClassName, beanInfo, properties
-                .getProperties() );
-
-        typeOracle.addBeanJsonMapperInfo( beanType, mapperInfo );
-
-        return mapperInfo;
-    }
-
     @Override
-    protected Optional<BeanJsonMapperInfo> getMapperInfo() {
+    protected final Optional<BeanJsonMapperInfo> getMapperInfo() {
         return Optional.of( mapperInfo );
     }
 
@@ -149,49 +94,18 @@ public abstract class AbstractBeanJsonCreator extends AbstractCreator {
      */
     public final BeanJsonMapperInfo create() throws UnableToCompleteException, UnsupportedTypeException {
 
-        PrintWriter printWriter = getPrintWriter( mapperInfo.getPackageName(), isSerializer() ? mapperInfo
-                .getSimpleSerializerClassName() : mapperInfo.getSimpleDeserializerClassName() );
+        final String simpleClassName = isSerializer() ? mapperInfo
+                .getSimpleSerializerClassName() : mapperInfo.getSimpleDeserializerClassName();
+
+        PrintWriter printWriter = getPrintWriter( mapperInfo.getPackageName(), simpleClassName );
         // the class already exists, no need to continue
         if ( printWriter == null ) {
             return mapperInfo;
         }
 
         try {
-
-            TypeName superclass;
-            if ( isSerializer() ) {
-                Class clazz;
-                if ( mapperInfo.getBeanInfo().getValuePropertyInfo().isPresent() ) {
-                    clazz = AbstractValueBeanJsonSerializer.class;
-                } else {
-                    clazz = AbstractBeanJsonSerializer.class;
-                }
-                superclass = parameterizedName( clazz, mapperInfo.getType() );
-            } else {
-                if ( isObject( mapperInfo.getType() ) ) {
-                    superclass = ClassName.get( AbstractObjectBeanJsonDeserializer.class );
-                } else if ( isSerializable( mapperInfo.getType() ) ) {
-                    superclass = ClassName.get( AbstractSerializableBeanJsonDeserializer.class );
-                } else if ( mapperInfo.getBeanInfo().isCreatorDelegation() ) {
-                    superclass = parameterizedName( AbstractDelegationBeanJsonDeserializer.class, mapperInfo.getType() );
-                } else {
-                    superclass = parameterizedName( AbstractBeanJsonDeserializer.class, mapperInfo.getType() );
-                }
-            }
-
-            typeBuilder = TypeSpec.classBuilder( getSimpleClassName() )
-                    .addModifiers( Modifier.PUBLIC )
-                    .superclass( superclass );
-
-            if ( null != mapperInfo.getType().isGenericType() ) {
-                for ( JTypeParameter typeParameter : mapperInfo.getType().isGenericType().getTypeParameters() ) {
-                    typeBuilder.addTypeVariable( typeVariableName( typeParameter ) );
-                }
-            }
-
-            buildClass();
-
-            write( mapperInfo.getPackageName(), typeBuilder.build(), printWriter );
+            TypeSpec type = buildClass( simpleClassName );
+            write( mapperInfo.getPackageName(), type, printWriter );
         } finally {
             printWriter.close();
         }
@@ -199,23 +113,67 @@ public abstract class AbstractBeanJsonCreator extends AbstractCreator {
         return mapperInfo;
     }
 
+    /**
+     * @return true if we are creating a serializer, false otherwise
+     */
     protected abstract boolean isSerializer();
 
-    protected String getSimpleClassName() {
+    /**
+     * Build the serializer/deserializer class.
+     *
+     * @param simpleClassName the name of the class
+     *
+     * @return the {@link TypeSpec}
+     * @throws UnableToCompleteException if an uncoverable exception occured
+     * @throws UnsupportedTypeException if the type is not supported
+     */
+    private TypeSpec buildClass( String simpleClassName ) throws UnableToCompleteException, UnsupportedTypeException {
+
+        TypeSpec.Builder typeBuilder = TypeSpec.classBuilder( simpleClassName )
+                .addModifiers( Modifier.PUBLIC );
+
+        // We add the superclass.
         if ( isSerializer() ) {
-            return mapperInfo.getSimpleSerializerClassName();
+            Class clazz;
+            if ( beanInfo.getValuePropertyInfo().isPresent() ) {
+                clazz = AbstractValueBeanJsonSerializer.class;
+            } else {
+                clazz = AbstractBeanJsonSerializer.class;
+            }
+            typeBuilder.superclass( parameterizedName( clazz, beanInfo.getType() ) );
         } else {
-            return mapperInfo.getSimpleDeserializerClassName();
+            if ( isObject( beanInfo.getType() ) ) {
+                typeBuilder.superclass( ClassName.get( AbstractObjectBeanJsonDeserializer.class ) );
+            } else if ( isSerializable( beanInfo.getType() ) ) {
+                typeBuilder.superclass( ClassName.get( AbstractSerializableBeanJsonDeserializer.class ) );
+            } else if ( beanInfo.isCreatorDelegation() ) {
+                typeBuilder.superclass( parameterizedName( AbstractDelegationBeanJsonDeserializer.class, beanInfo.getType() ) );
+            } else {
+                typeBuilder.superclass( parameterizedName( AbstractBeanJsonDeserializer.class, beanInfo.getType() ) );
+            }
         }
-    }
 
-    protected void buildClass() throws UnableToCompleteException, UnsupportedTypeException {
-        typeBuilder.addMethod( buildConstructor() );
+        // If the type is generic, the mapper must have the same parameters.
+        if ( null != beanInfo.getType().isGenericType() ) {
+            for ( JTypeParameter typeParameter : beanInfo.getType().isGenericType().getTypeParameters() ) {
+                typeBuilder.addTypeVariable( typeVariableName( typeParameter ) );
+            }
+        }
+
+        buildConstructor( typeBuilder );
         typeBuilder.addMethod( buildClassGetterMethod() );
-        buildSpecific();
+
+        buildSpecific( typeBuilder );
+
+        return typeBuilder.build();
     }
 
-    private MethodSpec buildConstructor() {
+    /**
+     * Build the constructor and the final fields.
+     *
+     * @param typeBuilder the type builder
+     */
+    private void buildConstructor( TypeSpec.Builder typeBuilder ) {
         MethodSpec.Builder constructorBuilder = MethodSpec.constructorBuilder().addModifiers( Modifier.PUBLIC );
 
         if ( !beanInfo.getParameterizedTypes().isEmpty() ) {
@@ -243,9 +201,14 @@ public abstract class AbstractBeanJsonCreator extends AbstractCreator {
             }
         }
 
-        return constructorBuilder.build();
+        typeBuilder.addMethod( constructorBuilder.build() );
     }
 
+    /**
+     * Build the method that returns the class of the mapped type.
+     *
+     * @return the method built
+     */
     private MethodSpec buildClassGetterMethod() {
         return MethodSpec.methodBuilder( isSerializer() ? "getSerializedType" : "getDeserializedType" )
                 .addModifiers( Modifier.PUBLIC )
@@ -255,21 +218,36 @@ public abstract class AbstractBeanJsonCreator extends AbstractCreator {
                 .build();
     }
 
-    protected abstract void buildSpecific() throws UnableToCompleteException, UnsupportedTypeException;
+    /**
+     * Method implemented by childs to add specific methods to the builder.
+     *
+     * @param typeBuilder the type builder
+     */
+    protected abstract void buildSpecific( TypeSpec.Builder typeBuilder ) throws UnableToCompleteException, UnsupportedTypeException;
 
-    protected CodeBlock generateTypeInfo( BeanTypeInfo typeInfo, boolean serialization ) {
-        CodeBlock.Builder builder = CodeBlock.builder()
-                .add( "new $T($T.$L, $S)", serialization ? TypeSerializationInfo.class : TypeDeserializationInfo.class,
-                        As.class, typeInfo.getInclude(), typeInfo.getPropertyName() )
-                .indent()
-                .indent();
+    /**
+     * Build the code to initialize a {@link TypeSerializationInfo} or {@link TypeDeserializationInfo}.
+     *
+     * @param typeInfo the type information obtained through the {@link JsonTypeInfo} annotation
+     *
+     * @return the code built
+     */
+    protected final CodeBlock generateTypeInfo( BeanTypeInfo typeInfo ) {
 
+        Class type;
         ImmutableMap<JClassType, String> mapTypeToMetadata;
-        if ( serialization ) {
+        if ( isSerializer() ) {
+            type = TypeSerializationInfo.class;
             mapTypeToMetadata = typeInfo.getMapTypeToSerializationMetadata();
         } else {
+            type = TypeDeserializationInfo.class;
             mapTypeToMetadata = typeInfo.getMapTypeToDeserializationMetadata();
         }
+
+        CodeBlock.Builder builder = CodeBlock.builder()
+                .add( "new $T($T.$L, $S)", type, As.class, typeInfo.getInclude(), typeInfo.getPropertyName() )
+                .indent()
+                .indent();
 
         for ( Entry<JClassType, String> entry : mapTypeToMetadata.entrySet() ) {
             builder.add( "\n.addTypeInfo($T.class, $S)", rawName( entry.getKey() ), entry.getValue() );
@@ -278,28 +256,13 @@ public abstract class AbstractBeanJsonCreator extends AbstractCreator {
         return builder.unindent().unindent().build();
     }
 
-    protected JClassType findFirstTypeToApplyPropertyAnnotation( JMapperType mapperType ) {
-        return findFirstTypeToApplyPropertyAnnotation( Arrays.asList( mapperType ) );
-    }
-
-    private JClassType findFirstTypeToApplyPropertyAnnotation( List<JMapperType> mapperTypeList ) {
-        if ( mapperTypeList.isEmpty() ) {
-            return null;
-        }
-
-        List<JMapperType> subLevel = new ArrayList<JMapperType>();
-        for ( JMapperType mapperType : mapperTypeList ) {
-            if ( mapperType.isBeanMapper() ) {
-                return mapperType.getType().isClass();
-            } else if ( mapperType.getParameters().size() > 0 ) {
-                subLevel.addAll( mapperType.getParameters() );
-            }
-        }
-
-        return findFirstTypeToApplyPropertyAnnotation( subLevel );
-    }
-
-    protected void buildCommonPropertyParameters( CodeBlock.Builder paramBuilder, PropertyInfo property ) {
+    /**
+     * Add the common property parameters to the code builder.
+     *
+     * @param paramBuilder the code builder
+     * @param property the information about the property
+     */
+    protected final void buildCommonPropertyParameters( CodeBlock.Builder paramBuilder, PropertyInfo property ) {
         if ( property.getFormat().isPresent() ) {
             JsonFormat format = property.getFormat().get();
 
@@ -322,7 +285,10 @@ public abstract class AbstractBeanJsonCreator extends AbstractCreator {
         }
     }
 
-    protected ImmutableList<JClassType> filterSubtypes( BeanInfo beanInfo ) {
+    /**
+     * @return the filtered subtypes of the mapped type
+     */
+    protected final ImmutableList<JClassType> filterSubtypes() {
         if ( isSerializer() ) {
             return CreatorUtils.filterSubtypesForSerialization( logger, configuration, beanInfo.getType() );
         } else {

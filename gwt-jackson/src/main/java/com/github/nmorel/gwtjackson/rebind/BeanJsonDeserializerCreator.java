@@ -79,6 +79,7 @@ import com.squareup.javapoet.ParameterizedTypeName;
 import com.squareup.javapoet.TypeName;
 import com.squareup.javapoet.TypeSpec;
 
+import static com.github.nmorel.gwtjackson.rebind.CreatorUtils.findFirstTypeToApplyPropertyAnnotation;
 import static com.github.nmorel.gwtjackson.rebind.CreatorUtils.getDefaultValueForType;
 import static com.github.nmorel.gwtjackson.rebind.writer.JTypeName.DEFAULT_WILDCARD;
 import static com.github.nmorel.gwtjackson.rebind.writer.JTypeName.parameterizedName;
@@ -102,12 +103,12 @@ public class BeanJsonDeserializerCreator extends AbstractBeanJsonCreator {
     }
 
     @Override
-    protected boolean isSerializer() {
+    protected final boolean isSerializer() {
         return false;
     }
 
     @Override
-    protected void buildSpecific() throws UnableToCompleteException, UnsupportedTypeException {
+    protected final void buildSpecific( TypeSpec.Builder typeBuilder ) throws UnableToCompleteException, UnsupportedTypeException {
 
         if ( beanInfo.getCreatorMethod().isPresent() ) {
             typeBuilder.addMethod( buildInitInstanceBuilderMethod() );
@@ -132,7 +133,7 @@ public class BeanJsonDeserializerCreator extends AbstractBeanJsonCreator {
             typeBuilder.addMethod( buildInitTypeInfoMethod( beanInfo.getTypeInfo().get() ) );
         }
 
-        ImmutableList<JClassType> subtypes = filterSubtypes( beanInfo );
+        ImmutableList<JClassType> subtypes = filterSubtypes();
         if ( !subtypes.isEmpty() ) {
             typeBuilder.addMethod( buildInitMapSubtypeClassToDeserializerMethod( subtypes ) );
         }
@@ -613,7 +614,7 @@ public class BeanJsonDeserializerCreator extends AbstractBeanJsonCreator {
         }
 
         if ( property.getTypeInfo().isPresent() ) {
-            paramBuilder.add( "\n.setTypeInfo($L)", generateTypeInfo( property.getTypeInfo().get(), false ) );
+            paramBuilder.add( "\n.setTypeInfo($L)", generateTypeInfo( property.getTypeInfo().get() ) );
         }
 
         paramBuilder.add( ";\n" )
@@ -749,7 +750,7 @@ public class BeanJsonDeserializerCreator extends AbstractBeanJsonCreator {
                 .addModifiers( Modifier.PROTECTED )
                 .addAnnotation( Override.class )
                 .returns( parameterizedName( TypeDeserializationInfo.class, beanInfo.getType() ) )
-                .addStatement( "return $L", generateTypeInfo( beanTypeInfo, false ) )
+                .addStatement( "return $L", generateTypeInfo( beanTypeInfo ) )
                 .build();
     }
 

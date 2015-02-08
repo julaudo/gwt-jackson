@@ -92,37 +92,41 @@ public class ObjectMapperCreator extends AbstractCreator {
             return qualifiedMapperClassName;
         }
 
-        // Extract the type of the object to map.
-        JClassType mappedTypeClass = extractMappedType( interfaceClass );
+        try {
+            // Extract the type of the object to map.
+            JClassType mappedTypeClass = extractMappedType( interfaceClass );
 
-        boolean reader = typeOracle.isObjectReader( interfaceClass );
-        boolean writer = typeOracle.isObjectWriter( interfaceClass );
-        Class<?> abstractClass;
-        if ( reader ) {
-            if ( writer ) {
-                abstractClass = AbstractObjectMapper.class;
+            boolean reader = typeOracle.isObjectReader( interfaceClass );
+            boolean writer = typeOracle.isObjectWriter( interfaceClass );
+            Class<?> abstractClass;
+            if ( reader ) {
+                if ( writer ) {
+                    abstractClass = AbstractObjectMapper.class;
+                } else {
+                    abstractClass = AbstractObjectReader.class;
+                }
             } else {
-                abstractClass = AbstractObjectReader.class;
+                abstractClass = AbstractObjectWriter.class;
             }
-        } else {
-            abstractClass = AbstractObjectWriter.class;
+
+            TypeSpec.Builder mapperBuilder = TypeSpec.classBuilder( mapperClassSimpleName )
+                    .addModifiers( Modifier.PUBLIC, Modifier.FINAL )
+                    .addSuperinterface( typeName( interfaceClass ) )
+                    .superclass( parameterizedName( abstractClass, mappedTypeClass ) )
+                    .addMethod( buildConstructor( mappedTypeClass ) );
+
+            if ( reader ) {
+                mapperBuilder.addMethod( buildNewDeserializerMethod( mappedTypeClass ) );
+            }
+
+            if ( writer ) {
+                mapperBuilder.addMethod( buildNewSerializerMethod( mappedTypeClass ) );
+            }
+
+            write( packageName, mapperBuilder.build(), printWriter );
+        } finally {
+            printWriter.close();
         }
-
-        TypeSpec.Builder mapperBuilder = TypeSpec.classBuilder( mapperClassSimpleName )
-                .addModifiers( Modifier.PUBLIC, Modifier.FINAL )
-                .addSuperinterface( typeName( interfaceClass ) )
-                .superclass( parameterizedName( abstractClass, mappedTypeClass ) )
-                .addMethod( buildConstructor( mappedTypeClass ) );
-
-        if ( reader ) {
-            mapperBuilder.addMethod( buildNewDeserializerMethod( mappedTypeClass ) );
-        }
-
-        if ( writer ) {
-            mapperBuilder.addMethod( buildNewSerializerMethod( mappedTypeClass ) );
-        }
-
-        write( packageName, mapperBuilder.build(), printWriter );
 
         return qualifiedMapperClassName;
     }

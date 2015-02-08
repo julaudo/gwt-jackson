@@ -37,7 +37,11 @@ import com.github.nmorel.gwtjackson.client.ser.map.key.EnumKeySerializer;
 import com.github.nmorel.gwtjackson.client.ser.map.key.KeySerializer;
 import com.github.nmorel.gwtjackson.rebind.RebindConfiguration.MapperInstance;
 import com.github.nmorel.gwtjackson.rebind.RebindConfiguration.MapperType;
+import com.github.nmorel.gwtjackson.rebind.bean.BeanInfo;
+import com.github.nmorel.gwtjackson.rebind.bean.BeanProcessor;
 import com.github.nmorel.gwtjackson.rebind.exception.UnsupportedTypeException;
+import com.github.nmorel.gwtjackson.rebind.property.PropertiesContainer;
+import com.github.nmorel.gwtjackson.rebind.property.processor.PropertyProcessor;
 import com.github.nmorel.gwtjackson.rebind.type.JDeserializerType;
 import com.github.nmorel.gwtjackson.rebind.type.JMapperType;
 import com.github.nmorel.gwtjackson.rebind.type.JSerializerType;
@@ -121,6 +125,62 @@ public abstract class AbstractCreator extends AbstractSourceCreator {
             logger.log( TreeLogger.Type.ERROR, "Error writing the file " + packageName + "." + type.name, e );
             throw new UnableToCompleteException();
         }
+    }
+
+    /**
+     * Returns the mapper information for the given type. The result is cached.
+     *
+     * @param beanType the type
+     *
+     * @return the mapper information
+     * @throws UnableToCompleteException if an exception occured while processing the type
+     */
+    protected BeanJsonMapperInfo getMapperInfo( JClassType beanType ) throws UnableToCompleteException {
+        BeanJsonMapperInfo mapperInfo = typeOracle.getBeanJsonMapperInfo( beanType );
+        if ( null != mapperInfo ) {
+            return mapperInfo;
+        }
+
+        boolean samePackage = true;
+        String packageName = beanType.getPackage().getName();
+        // We can't create classes in the java package so we prefix it.
+        if ( packageName.startsWith( "java." ) ) {
+            packageName = "gwtjackson." + packageName;
+            samePackage = false;
+        }
+
+        // Retrieve the informations on the beans and its properties.
+        BeanInfo beanInfo = BeanProcessor.processBean( logger, typeOracle, configuration, beanType );
+        PropertiesContainer properties = PropertyProcessor
+                .findAllProperties( configuration, logger, typeOracle, beanInfo, samePackage );
+        beanInfo = BeanProcessor.processProperties( configuration, logger, typeOracle, beanInfo, properties );
+
+        // We concatenate the name of all the enclosing classes.
+        StringBuilder builder = new StringBuilder( beanType.getSimpleSourceName() );
+        JClassType enclosingType = beanType.getEnclosingType();
+        while ( null != enclosingType ) {
+            builder.insert( 0, enclosingType.getSimpleSourceName() + "_" );
+            enclosingType = enclosingType.getEnclosingType();
+        }
+
+        // If the type is specific to the mapper, we concatenate the name and hash of the mapper to it.
+        boolean isSpecificToMapper = configuration.isSpecificToMapper( beanType );
+        if ( isSpecificToMapper ) {
+            JClassType rootMapperClass = configuration.getRootMapperClass();
+            builder.insert( 0, '_' ).insert( 0, configuration.getRootMapperHash() ).insert( 0, '_' ).insert( 0, rootMapperClass
+                    .getSimpleSourceName() );
+        }
+
+        String simpleSerializerClassName = builder.toString() + "BeanJsonSerializerImpl";
+        String simpleDeserializerClassName = builder.toString() + "BeanJsonDeserializerImpl";
+
+        mapperInfo = new BeanJsonMapperInfo( beanType, packageName, samePackage, simpleSerializerClassName,
+                simpleDeserializerClassName, beanInfo, properties
+                .getProperties() );
+
+        typeOracle.addBeanJsonMapperInfo( beanType, mapperInfo );
+
+        return mapperInfo;
     }
 
     protected abstract Optional<BeanJsonMapperInfo> getMapperInfo();

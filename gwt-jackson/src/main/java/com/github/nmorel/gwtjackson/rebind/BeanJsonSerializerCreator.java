@@ -66,6 +66,7 @@ import com.squareup.javapoet.TypeName;
 import com.squareup.javapoet.TypeSpec;
 
 import static com.github.nmorel.gwtjackson.rebind.CreatorUtils.escapeString;
+import static com.github.nmorel.gwtjackson.rebind.CreatorUtils.findFirstTypeToApplyPropertyAnnotation;
 import static com.github.nmorel.gwtjackson.rebind.writer.JTypeName.DEFAULT_WILDCARD;
 import static com.github.nmorel.gwtjackson.rebind.writer.JTypeName.parameterizedName;
 import static com.github.nmorel.gwtjackson.rebind.writer.JTypeName.rawName;
@@ -82,12 +83,12 @@ public class BeanJsonSerializerCreator extends AbstractBeanJsonCreator {
     }
 
     @Override
-    protected boolean isSerializer() {
+    protected final boolean isSerializer() {
         return true;
     }
 
     @Override
-    protected void buildSpecific() throws UnableToCompleteException {
+    protected final void buildSpecific( TypeSpec.Builder typeBuilder ) throws UnableToCompleteException {
 
         if ( !properties.isEmpty() ) {
             if ( beanInfo.getValuePropertyInfo().isPresent() ) {
@@ -123,7 +124,7 @@ public class BeanJsonSerializerCreator extends AbstractBeanJsonCreator {
             typeBuilder.addMethod( buildInitTypeInfoMethod() );
         }
 
-        ImmutableList<JClassType> subtypes = filterSubtypes( beanInfo );
+        ImmutableList<JClassType> subtypes = filterSubtypes();
         if ( !subtypes.isEmpty() ) {
             typeBuilder.addMethod( buildInitMapSubtypeClassToSerializerMethod( subtypes ) );
         }
@@ -234,7 +235,7 @@ public class BeanJsonSerializerCreator extends AbstractBeanJsonCreator {
                 .addModifiers( Modifier.PROTECTED )
                 .addAnnotation( Override.class )
                 .returns( parameterizedName( TypeSerializationInfo.class, beanInfo.getType() ) )
-                .addStatement( "return $L", generateTypeInfo( beanInfo.getTypeInfo().get(), true ) )
+                .addStatement( "return $L", generateTypeInfo( beanInfo.getTypeInfo().get() ) )
                 .build();
     }
 
@@ -308,7 +309,7 @@ public class BeanJsonSerializerCreator extends AbstractBeanJsonCreator {
 
         if ( identityInfo.isIdABeanProperty() ) {
 
-            BeanJsonMapperInfo mapperInfo = typeOracle.getBeanJsonMapperInfo( type );
+            BeanJsonMapperInfo mapperInfo = getMapperInfo( type );
             PropertyInfo propertyInfo = mapperInfo.getProperties().get( identityInfo.getPropertyName() );
             JSerializerType propertySerializerType = getJsonSerializerFromType( propertyInfo.getType() );
 
@@ -437,7 +438,7 @@ public class BeanJsonSerializerCreator extends AbstractBeanJsonCreator {
         }
 
         if ( property.getTypeInfo().isPresent() ) {
-            paramBuilder.add( "\n.setTypeInfo($L)", generateTypeInfo( property.getTypeInfo().get(), true ) );
+            paramBuilder.add( "\n.setTypeInfo($L)", generateTypeInfo( property.getTypeInfo().get() ) );
         }
 
         if ( property.isUnwrapped() ) {

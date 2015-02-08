@@ -18,9 +18,12 @@ package com.github.nmorel.gwtjackson.rebind;
 
 import java.io.Serializable;
 import java.lang.annotation.Annotation;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 import com.github.nmorel.gwtjackson.client.stream.impl.DefaultJsonWriter;
+import com.github.nmorel.gwtjackson.rebind.type.JMapperType;
 import com.google.gwt.core.ext.TreeLogger;
 import com.google.gwt.core.ext.typeinfo.HasAnnotations;
 import com.google.gwt.core.ext.typeinfo.JClassType;
@@ -195,6 +198,37 @@ public final class CreatorUtils {
      */
     public static String escapeString( String value ) {
         return DefaultJsonWriter.encodeString( value );
+    }
+
+    /**
+     * @param mapperType the type to search inside
+     *
+     * @return the first bean type encountered
+     */
+    public static JClassType findFirstTypeToApplyPropertyAnnotation( JMapperType mapperType ) {
+        return findFirstTypeToApplyPropertyAnnotation( Arrays.asList( mapperType ) );
+    }
+
+    /**
+     * @param mapperTypeList the types to search inside
+     *
+     * @return the first bean type encountered
+     */
+    private static JClassType findFirstTypeToApplyPropertyAnnotation( List<JMapperType> mapperTypeList ) {
+        if ( mapperTypeList.isEmpty() ) {
+            return null;
+        }
+
+        List<JMapperType> subLevel = new ArrayList<JMapperType>();
+        for ( JMapperType mapperType : mapperTypeList ) {
+            if ( mapperType.isBeanMapper() ) {
+                return mapperType.getType().isClass();
+            } else if ( mapperType.getParameters().size() > 0 ) {
+                subLevel.addAll( mapperType.getParameters() );
+            }
+        }
+
+        return findFirstTypeToApplyPropertyAnnotation( subLevel );
     }
 
     private CreatorUtils() {
