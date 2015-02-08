@@ -197,7 +197,7 @@ public class BeanJsonSerializerCreator extends AbstractBeanJsonCreator {
                     .addParameter( JClassName.get( beanInfo.getType() ), "bean" )
                     .addParameter( JsonSerializationContext.class, "ctx" );
             if ( !property.isUnwrapped() ) {
-                methodBuilder.addStatement( "writer.name( propertyName )" );
+                methodBuilder.addStatement( "writer.name(propertyName)" );
             }
             builder.addMethod( methodBuilder.build() );
         }

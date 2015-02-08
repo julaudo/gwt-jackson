@@ -172,7 +172,7 @@ public class BeanJsonDeserializerCreator extends AbstractBeanJsonCreator {
                         .builder( deserializerTypeName,
                                 INSTANCE_BUILDER_DESERIALIZER_PREFIX + String.format( INSTANCE_BUILDER_VARIABLE_FORMAT, index++ ),
                                 Modifier.PRIVATE, Modifier.FINAL )
-                        .initializer( "$L", deserializerBuilder )
+                        .initializer( "$L", deserializerBuilder.build() )
                         .build() );
             }
         }
@@ -233,7 +233,7 @@ public class BeanJsonDeserializerCreator extends AbstractBeanJsonCreator {
             propertyNameToVariableBuilder.put( name, variableName );
             PropertyInfo propertyInfo = properties.get( name );
 
-            newInstanceMethodBuilder.addCode( "$T $L = $L; // $L\n",
+            newInstanceMethodBuilder.addCode( "$T $L = $L; // property '$L'\n",
                     JClassName.get( propertyInfo.getType() ), variableName, getDefaultValueForType( propertyInfo.getType() ), name );
 
             if ( propertyInfo.isRequired() ) {
@@ -263,7 +263,7 @@ public class BeanJsonDeserializerCreator extends AbstractBeanJsonCreator {
 
         newInstanceMethodBuilder.addCode( "\n" );
 
-        newInstanceMethodBuilder.beginControlFlow( "if(null != bufferedProperties)" );
+        newInstanceMethodBuilder.beginControlFlow( "if (null != bufferedProperties)" );
         newInstanceMethodBuilder.addStatement( "String value" );
         for ( String name : beanInfo.getCreatorParameters().keySet() ) {
             String variableName = propertyNameToVariable.get( name );
@@ -271,8 +271,8 @@ public class BeanJsonDeserializerCreator extends AbstractBeanJsonCreator {
 
             newInstanceMethodBuilder.addCode( "\n" );
             newInstanceMethodBuilder.addStatement( "value = bufferedProperties.remove($S)", name );
-            newInstanceMethodBuilder.beginControlFlow( "if(null != value)" );
-            newInstanceMethodBuilder.addStatement( "$L = $L.deserialize(ctx.newJsonReader(value), ctx);",
+            newInstanceMethodBuilder.beginControlFlow( "if (null != value)" );
+            newInstanceMethodBuilder.addStatement( "$L = $L.deserialize(ctx.newJsonReader(value), ctx)",
                     variableName, INSTANCE_BUILDER_DESERIALIZER_PREFIX + variableName );
             newInstanceMethodBuilder.addStatement( "nbParamToFind--" );
             if ( propertyInfo.isRequired() ) {
@@ -294,7 +294,7 @@ public class BeanJsonDeserializerCreator extends AbstractBeanJsonCreator {
             String variableName = propertyNameToVariable.get( name );
             PropertyInfo propertyInfo = properties.get( name );
 
-            newInstanceMethodBuilder.beginControlFlow( "if($S.equals(name))", name );
+            newInstanceMethodBuilder.beginControlFlow( "if ($S.equals(name))", name );
             newInstanceMethodBuilder.addStatement( "$L = $L.deserialize(reader, ctx)",
                     variableName, INSTANCE_BUILDER_DESERIALIZER_PREFIX + variableName );
             newInstanceMethodBuilder.addStatement( "nbParamToFind--" );
@@ -303,24 +303,24 @@ public class BeanJsonDeserializerCreator extends AbstractBeanJsonCreator {
             }
             newInstanceMethodBuilder.addStatement( "continue" );
             newInstanceMethodBuilder.endControlFlow();
+
+            newInstanceMethodBuilder.addCode( "\n" );
         }
 
-        newInstanceMethodBuilder.addCode( "\n" );
-
-        newInstanceMethodBuilder.beginControlFlow( "if(null == bufferedProperties)" );
+        newInstanceMethodBuilder.beginControlFlow( "if (null == bufferedProperties)" );
         newInstanceMethodBuilder.addStatement( "bufferedProperties = new $T()",
                 ParameterizedTypeName.get( HashMap.class, String.class, String.class ) );
         newInstanceMethodBuilder.endControlFlow();
-        newInstanceMethodBuilder.addStatement( "bufferedProperties.put( name, reader.nextValue() )" );
+        newInstanceMethodBuilder.addStatement( "bufferedProperties.put(name, reader.nextValue())" );
 
         newInstanceMethodBuilder.endControlFlow();
 
         newInstanceMethodBuilder.addCode( "\n" );
 
         if ( !requiredProperties.isEmpty() ) {
-            newInstanceMethodBuilder.beginControlFlow( "if(!requiredProperties.isEmpty()) {" );
+            newInstanceMethodBuilder.beginControlFlow( "if (!requiredProperties.isEmpty())" );
             newInstanceMethodBuilder
-                    .addStatement( "throw ctx.traceError( \"Required properties are missing : \" + requiredProperties, reader )" );
+                    .addStatement( "throw ctx.traceError(\"Required properties are missing : \" + requiredProperties, reader)" );
             newInstanceMethodBuilder.endControlFlow();
             newInstanceMethodBuilder.addCode( "\n" );
         }
@@ -538,7 +538,7 @@ public class BeanJsonDeserializerCreator extends AbstractBeanJsonCreator {
                 .addStatement( "$L", accessor.getAccessor() );
 
         if ( property.getManagedReference().isPresent() ) {
-            methodBuilder.addStatement( "getDeserializer().setBackReference($S, $L, $L, ctx);",
+            methodBuilder.addStatement( "getDeserializer().setBackReference($S, $L, $L, ctx)",
                     property.getManagedReference().get(), paramBean, paramValue );
         }
 
@@ -625,6 +625,7 @@ public class BeanJsonDeserializerCreator extends AbstractBeanJsonCreator {
         return Optional.of( MethodSpec.methodBuilder( "newParameters" )
                 .addModifiers( Modifier.PROTECTED )
                 .addAnnotation( Override.class )
+                .addCode( paramBuilder.build() )
                 .returns( JsonDeserializerParameters.class )
                 .build() );
     }

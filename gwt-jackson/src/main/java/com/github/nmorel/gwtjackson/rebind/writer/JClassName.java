@@ -21,6 +21,7 @@ import java.util.List;
 
 import com.google.gwt.core.ext.typeinfo.JArrayType;
 import com.google.gwt.core.ext.typeinfo.JClassType;
+import com.google.gwt.core.ext.typeinfo.JGenericType;
 import com.google.gwt.core.ext.typeinfo.JParameterizedType;
 import com.google.gwt.core.ext.typeinfo.JPrimitiveType;
 import com.google.gwt.core.ext.typeinfo.JType;
@@ -49,6 +50,8 @@ public final class JClassName {
             return getPrimitiveName( type.isPrimitive(), boxed );
         } else if ( null != type.isParameterized() ) {
             return getParameterizedTypeName( type.isParameterized() );
+        } else if ( null != type.isGenericType() ) {
+            return getGenericTypeName( type.isGenericType() );
         } else if ( null != type.isArray() ) {
             return getArrayTypeName( type.isArray() );
         } else if ( null != type.isTypeParameter() ) {
@@ -114,6 +117,10 @@ public final class JClassName {
 
     private static ParameterizedTypeName getParameterizedTypeName( JParameterizedType type ) {
         return ParameterizedTypeName.get( getClassName( type ), get( true, type.getTypeArgs() ) );
+    }
+
+    private static ParameterizedTypeName getGenericTypeName( JGenericType type ) {
+        return ParameterizedTypeName.get( getClassName( type ), get( true, type.getTypeParameters() ) );
     }
 
     private static ArrayTypeName getArrayTypeName( JArrayType type ) {
