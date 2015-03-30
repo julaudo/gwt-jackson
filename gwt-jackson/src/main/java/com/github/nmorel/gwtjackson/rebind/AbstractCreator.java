@@ -17,8 +17,6 @@
 package com.github.nmorel.gwtjackson.rebind;
 
 import javax.lang.model.element.Modifier;
-import java.io.IOException;
-import java.io.PrintWriter;
 import java.util.Iterator;
 
 import com.github.nmorel.gwtjackson.client.JsonSerializer;
@@ -37,18 +35,11 @@ import com.github.nmorel.gwtjackson.client.ser.map.key.EnumKeySerializer;
 import com.github.nmorel.gwtjackson.client.ser.map.key.KeySerializer;
 import com.github.nmorel.gwtjackson.rebind.RebindConfiguration.MapperInstance;
 import com.github.nmorel.gwtjackson.rebind.RebindConfiguration.MapperType;
-import com.github.nmorel.gwtjackson.rebind.bean.BeanInfo;
-import com.github.nmorel.gwtjackson.rebind.bean.BeanProcessor;
+import com.github.nmorel.gwtjackson.rebind.exception.UnexpectedErrorException;
 import com.github.nmorel.gwtjackson.rebind.exception.UnsupportedTypeException;
-import com.github.nmorel.gwtjackson.rebind.property.PropertiesContainer;
-import com.github.nmorel.gwtjackson.rebind.property.PropertyProcessor;
 import com.github.nmorel.gwtjackson.rebind.type.JDeserializerType;
 import com.github.nmorel.gwtjackson.rebind.type.JMapperType;
 import com.github.nmorel.gwtjackson.rebind.type.JSerializerType;
-import com.google.gwt.core.ext.GeneratorContext;
-import com.google.gwt.core.ext.TreeLogger;
-import com.google.gwt.core.ext.TreeLogger.Type;
-import com.google.gwt.core.ext.UnableToCompleteException;
 import com.google.gwt.core.ext.typeinfo.JArrayType;
 import com.google.gwt.core.ext.typeinfo.JClassType;
 import com.google.gwt.core.ext.typeinfo.JEnumType;
@@ -61,7 +52,6 @@ import com.google.gwt.thirdparty.guava.common.collect.ImmutableList;
 import com.google.gwt.user.rebind.AbstractSourceCreator;
 import com.squareup.javapoet.ClassName;
 import com.squareup.javapoet.CodeBlock;
-import com.squareup.javapoet.JavaFile;
 import com.squareup.javapoet.MethodSpec;
 import com.squareup.javapoet.TypeSpec;
 
@@ -78,109 +68,10 @@ public abstract class AbstractCreator extends AbstractSourceCreator {
 
     protected static final String TYPE_PARAMETER_SERIALIZER_FIELD_NAME = "serializer%d";
 
-    protected final TreeLogger logger;
+    protected final GwtContext context;
 
-    protected final GeneratorContext context;
-
-    protected final RebindConfiguration configuration;
-
-    protected final JacksonTypeOracle typeOracle;
-
-    protected AbstractCreator( TreeLogger logger, GeneratorContext context, RebindConfiguration configuration, JacksonTypeOracle
-            typeOracle ) {
-        this.logger = logger;
+    protected AbstractCreator( GwtContext context ) {
         this.context = context;
-        this.configuration = configuration;
-        this.typeOracle = typeOracle;
-    }
-
-    /**
-     * Creates the {@link PrintWriter} to write the class.
-     *
-     * @param packageName the package
-     * @param className the name of the class
-     *
-     * @return the {@link PrintWriter} or null if the class already exists.
-     */
-    protected final PrintWriter getPrintWriter( String packageName, String className ) {
-        return context.tryCreate( logger, packageName, className );
-    }
-
-    /**
-     * Writes the given type to the {@link PrintWriter}.
-     *
-     * @param packageName the package for the type
-     * @param type the type
-     * @param printWriter the writer
-     *
-     * @throws UnableToCompleteException if an exception is thrown by the writer
-     */
-    protected final void write( String packageName, TypeSpec type, PrintWriter printWriter ) throws UnableToCompleteException {
-        try {
-            JavaFile.builder( packageName, type )
-                    .build()
-                    .writeTo( printWriter );
-            context.commit( logger, printWriter );
-        } catch ( IOException e ) {
-            logger.log( TreeLogger.Type.ERROR, "Error writing the file " + packageName + "." + type.name, e );
-            throw new UnableToCompleteException();
-        }
-    }
-
-    /**
-     * Returns the mapper information for the given type. The result is cached.
-     *
-     * @param beanType the type
-     *
-     * @return the mapper information
-     * @throws UnableToCompleteException if an exception occured while processing the type
-     */
-    protected final BeanJsonMapperInfo getMapperInfo( JClassType beanType ) throws UnableToCompleteException {
-        BeanJsonMapperInfo mapperInfo = typeOracle.getBeanJsonMapperInfo( beanType );
-        if ( null != mapperInfo ) {
-            return mapperInfo;
-        }
-
-        boolean samePackage = true;
-        String packageName = beanType.getPackage().getName();
-        // We can't create classes in the java package so we prefix it.
-        if ( packageName.startsWith( "java." ) ) {
-            packageName = "gwtjackson." + packageName;
-            samePackage = false;
-        }
-
-        // Retrieve the informations on the beans and its properties.
-        BeanInfo beanInfo = BeanProcessor.processBean( logger, typeOracle, configuration, beanType );
-        PropertiesContainer properties = PropertyProcessor
-                .findAllProperties( configuration, logger, typeOracle, beanInfo, samePackage );
-        beanInfo = BeanProcessor.processProperties( configuration, logger, typeOracle, beanInfo, properties );
-
-        // We concatenate the name of all the enclosing classes.
-        StringBuilder builder = new StringBuilder( beanType.getSimpleSourceName() );
-        JClassType enclosingType = beanType.getEnclosingType();
-        while ( null != enclosingType ) {
-            builder.insert( 0, enclosingType.getSimpleSourceName() + "_" );
-            enclosingType = enclosingType.getEnclosingType();
-        }
-
-        // If the type is specific to the mapper, we concatenate the name and hash of the mapper to it.
-        boolean isSpecificToMapper = configuration.isSpecificToMapper( beanType );
-        if ( isSpecificToMapper ) {
-            JClassType rootMapperClass = configuration.getRootMapperClass();
-            builder.insert( 0, '_' ).insert( 0, configuration.getRootMapperHash() ).insert( 0, '_' ).insert( 0, rootMapperClass
-                    .getSimpleSourceName() );
-        }
-
-        String simpleSerializerClassName = builder.toString() + "BeanJsonSerializerImpl";
-        String simpleDeserializerClassName = builder.toString() + "BeanJsonDeserializerImpl";
-
-        mapperInfo = new BeanJsonMapperInfo( beanType, packageName, samePackage, simpleSerializerClassName,
-                simpleDeserializerClassName, beanInfo, properties
-                .getProperties() );
-
-        typeOracle.addBeanJsonMapperInfo( beanType, mapperInfo );
-
-        return mapperInfo;
     }
 
     protected abstract Optional<BeanJsonMapperInfo> getMapperInfo();
@@ -197,7 +88,7 @@ public abstract class AbstractCreator extends AbstractSourceCreator {
      * <li>new org.PersonBeanJsonSerializer()</li>
      * </ul>
      */
-    protected final JSerializerType getJsonSerializerFromType( JType type ) throws UnableToCompleteException, UnsupportedTypeException {
+    protected final JSerializerType getJsonSerializerFromType( JType type ) throws UnsupportedTypeException {
         return getJsonSerializerFromType( type, false );
     }
 
@@ -215,7 +106,7 @@ public abstract class AbstractCreator extends AbstractSourceCreator {
      * </ul>
      */
     protected final JSerializerType getJsonSerializerFromType( JType type, boolean subtype )
-            throws UnableToCompleteException, UnsupportedTypeException {
+            throws UnsupportedTypeException {
 
         JSerializerType.Builder builder = new JSerializerType.Builder().type( type );
         if ( null != type.isWildcard() ) {
@@ -243,7 +134,7 @@ public abstract class AbstractCreator extends AbstractSourceCreator {
             }
         }
 
-        Optional<MapperInstance> configuredSerializer = configuration.getSerializer( type );
+        Optional<MapperInstance> configuredSerializer = context.getSerializer( type );
         if ( configuredSerializer.isPresent() ) {
             // The type is configured in AbstractConfiguration.
             if ( null != type.isParameterized() || null != type.isGenericType() ) {
@@ -275,9 +166,9 @@ public abstract class AbstractCreator extends AbstractSourceCreator {
             return builder.build();
         }
 
-        if ( typeOracle.isJavaScriptObject( type ) ) {
+        if ( context.isJavaScriptObject( type ) ) {
             // It's a JSO and the user didn't give a custom serializer. We use the default one.
-            configuredSerializer = configuration.getSerializer( typeOracle.getJavaScriptObject() );
+            configuredSerializer = context.getSerializer( context.getJavaScriptObject() );
             return builder.instance( methodCallCode( configuredSerializer.get() ) ).build();
         }
 
@@ -305,7 +196,7 @@ public abstract class AbstractCreator extends AbstractSourceCreator {
             } else {
                 // More dimensions are not supported
                 String message = "Arrays with 3 or more dimensions are not supported";
-                logger.log( TreeLogger.Type.WARN, message );
+                context.warn( message );
                 throw new UnsupportedTypeException( message );
             }
             JSerializerType parameterSerializerType = getJsonSerializerFromType( arrayType.getLeafType(), subtype );
@@ -318,7 +209,7 @@ public abstract class AbstractCreator extends AbstractSourceCreator {
 
         if ( null != type.isAnnotation() ) {
             String message = "Annotations are not supported";
-            logger.log( TreeLogger.Type.WARN, message );
+            context.warn( message );
             throw new UnsupportedTypeException( message );
         }
 
@@ -332,9 +223,8 @@ public abstract class AbstractCreator extends AbstractSourceCreator {
                 baseClassType = parameterizedType.getBaseType();
             }
 
-            BeanJsonSerializerCreator beanJsonSerializerCreator = new BeanJsonSerializerCreator(
-                    logger.branch( Type.DEBUG, "Creating serializer for " + baseClassType.getQualifiedSourceName() ),
-                    context, configuration, typeOracle, baseClassType );
+            BeanJsonSerializerCreator beanJsonSerializerCreator = new BeanJsonSerializerCreator( context
+                    .branch( "Creating serializer for " + baseClassType.getQualifiedSourceName(), baseClassType );
             BeanJsonMapperInfo mapperInfo = beanJsonSerializerCreator.create();
 
             // Generics and parameterized types serializers have no default constructor. They need serializers for each parameter.
@@ -353,7 +243,7 @@ public abstract class AbstractCreator extends AbstractSourceCreator {
         }
 
         String message = "Type '" + type.getQualifiedSourceName() + "' is not supported";
-        logger.log( TreeLogger.Type.WARN, message );
+        context.warn( message );
         throw new UnsupportedTypeException( message );
     }
 
@@ -376,7 +266,7 @@ public abstract class AbstractCreator extends AbstractSourceCreator {
             type = type.isRawType().getBaseType();
         }
 
-        Optional<MapperInstance> keySerializer = configuration.getKeySerializer( type );
+        Optional<MapperInstance> keySerializer = context.getKeySerializer( type );
         if ( keySerializer.isPresent() ) {
             builder.instance( methodCallCode( keySerializer.get() ) );
             return builder.build();
@@ -395,7 +285,7 @@ public abstract class AbstractCreator extends AbstractSourceCreator {
         }
 
         String message = "Type '" + type.getQualifiedSourceName() + "' is not supported as map's key";
-        logger.log( TreeLogger.Type.WARN, message );
+        context.warn( message );
         throw new UnsupportedTypeException( message );
     }
 
@@ -411,7 +301,7 @@ public abstract class AbstractCreator extends AbstractSourceCreator {
      * <li>new org .PersonBeanJsonDeserializer()</li>
      * </ul>
      */
-    protected final JDeserializerType getJsonDeserializerFromType( JType type ) throws UnableToCompleteException, UnsupportedTypeException {
+    protected final JDeserializerType getJsonDeserializerFromType( JType type ) throws UnsupportedTypeException {
         return getJsonDeserializerFromType( type, false );
     }
 
@@ -428,7 +318,7 @@ public abstract class AbstractCreator extends AbstractSourceCreator {
      * <li>new org .PersonBeanJsonDeserializer()</li>
      * </ul>
      */
-    protected final JDeserializerType getJsonDeserializerFromType( JType type, boolean subtype ) throws UnableToCompleteException,
+    protected final JDeserializerType getJsonDeserializerFromType( JType type, boolean subtype ) throws
             UnsupportedTypeException {
         JDeserializerType.Builder builder = new JDeserializerType.Builder().type( type );
         if ( null != type.isWildcard() ) {
@@ -456,7 +346,7 @@ public abstract class AbstractCreator extends AbstractSourceCreator {
             }
         }
 
-        Optional<MapperInstance> configuredDeserializer = configuration.getDeserializer( type );
+        Optional<MapperInstance> configuredDeserializer = context.getDeserializer( type );
         if ( configuredDeserializer.isPresent() ) {
             // The type is configured in AbstractConfiguration.
             if ( null != type.isParameterized() || null != type.isGenericType() ) {
@@ -488,9 +378,9 @@ public abstract class AbstractCreator extends AbstractSourceCreator {
             return builder.build();
         }
 
-        if ( typeOracle.isJavaScriptObject( type ) ) {
+        if ( context.isJavaScriptObject( type ) ) {
             // It's a JSO and the user didn't give a custom deserializer. We use the default one.
-            configuredDeserializer = configuration.getDeserializer( typeOracle.getJavaScriptObject() );
+            configuredDeserializer = context.getDeserializer( context.getJavaScriptObject() );
             return builder.instance( methodCallCode( configuredDeserializer.get() ) ).build();
         }
 
@@ -504,7 +394,7 @@ public abstract class AbstractCreator extends AbstractSourceCreator {
 
         if ( Enum.class.getName().equals( type.getQualifiedSourceName() ) ) {
             String message = "Type java.lang.Enum is not supported by deserialization";
-            logger.log( TreeLogger.Type.WARN, message );
+            context.warn( message );
             throw new UnsupportedTypeException( message );
         }
 
@@ -546,7 +436,7 @@ public abstract class AbstractCreator extends AbstractSourceCreator {
             } else {
                 // More dimensions are not supported
                 String message = "Arrays with 3 or more dimensions are not supported";
-                logger.log( TreeLogger.Type.WARN, message );
+                context.warn( message );
                 throw new UnsupportedTypeException( message );
             }
 
@@ -559,7 +449,7 @@ public abstract class AbstractCreator extends AbstractSourceCreator {
 
         if ( null != type.isAnnotation() ) {
             String message = "Annotations are not supported";
-            logger.log( TreeLogger.Type.WARN, message );
+            context.warn( message );
             throw new UnsupportedTypeException( message );
         }
 
@@ -574,8 +464,7 @@ public abstract class AbstractCreator extends AbstractSourceCreator {
             }
 
             BeanJsonDeserializerCreator beanJsonDeserializerCreator = new BeanJsonDeserializerCreator(
-                    logger.branch( Type.DEBUG, "Creating deserializer for " + baseClassType.getQualifiedSourceName() ),
-                    context, configuration, typeOracle, baseClassType );
+                    context.branch( "Creating deserializer for " + baseClassType.getQualifiedSourceName() ), baseClassType );
             BeanJsonMapperInfo mapperInfo = beanJsonDeserializerCreator.create();
 
             // Generics and parameterized types deserializers have no default constructor. They need deserializers for each parameter.
@@ -594,7 +483,7 @@ public abstract class AbstractCreator extends AbstractSourceCreator {
         }
 
         String message = "Type '" + type.getQualifiedSourceName() + "' is not supported";
-        logger.log( TreeLogger.Type.WARN, message );
+        context.warn( message );
         throw new UnsupportedTypeException( message );
     }
 
@@ -605,7 +494,7 @@ public abstract class AbstractCreator extends AbstractSourceCreator {
      *
      * @return the {@link JDeserializerType}.
      */
-    protected final JDeserializerType getKeyDeserializerFromType( JType type ) throws UnsupportedTypeException {
+    protected final JDeserializerType getKeyDeserializerFromType( JType type ) {
         JDeserializerType.Builder builder = new JDeserializerType.Builder().type( type );
         if ( null != type.isWildcard() ) {
             // For wildcard type, we use the base type to find the deserializer.
@@ -617,7 +506,7 @@ public abstract class AbstractCreator extends AbstractSourceCreator {
             type = type.isRawType().getBaseType();
         }
 
-        Optional<MapperInstance> keyDeserializer = configuration.getKeyDeserializer( type );
+        Optional<MapperInstance> keyDeserializer = context.getKeyDeserializer( type );
         if ( keyDeserializer.isPresent() ) {
             builder.instance( methodCallCode( keyDeserializer.get() ) );
             return builder.build();
@@ -632,8 +521,8 @@ public abstract class AbstractCreator extends AbstractSourceCreator {
         }
 
         String message = "Type '" + type.getQualifiedSourceName() + "' is not supported as map's key";
-        logger.log( TreeLogger.Type.WARN, message );
-        throw new UnsupportedTypeException( message );
+        context.warn( message );
+        throw new UnexpectedErrorException( message );
     }
 
     private ImmutableList<? extends JType> getTypeParameters( JClassType classType, boolean subtype ) {

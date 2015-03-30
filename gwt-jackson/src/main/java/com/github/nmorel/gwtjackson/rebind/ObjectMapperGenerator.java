@@ -31,8 +31,9 @@ public class ObjectMapperGenerator extends Generator {
     public final String generate( TreeLogger logger, GeneratorContext context, String typeName ) throws UnableToCompleteException {
         JacksonTypeOracle typeOracle = new JacksonTypeOracle( logger, context.getTypeOracle() );
         JClassType rootMapperClass = typeOracle.getType( typeName );
-        RebindConfiguration configuration = new RebindConfiguration( logger, context, typeOracle, rootMapperClass );
-        ObjectMapperCreator creator = new ObjectMapperCreator( logger, context, configuration, typeOracle );
+        GwtContext gwtContext = new GwtContext( logger, context, new RebindConfiguration( logger, context, typeOracle, rootMapperClass ),
+                typeOracle );
+        ObjectMapperCreator creator = new ObjectMapperCreator( gwtContext );
         return creator.create( rootMapperClass );
     }
 }

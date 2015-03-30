@@ -25,9 +25,9 @@ import com.github.nmorel.gwtjackson.client.ObjectReader;
 import com.github.nmorel.gwtjackson.client.ObjectWriter;
 import com.github.nmorel.gwtjackson.client.deser.map.key.KeyDeserializer;
 import com.github.nmorel.gwtjackson.client.ser.map.key.KeySerializer;
+import com.github.nmorel.gwtjackson.rebind.exception.UnexpectedErrorException;
 import com.google.gwt.core.client.JavaScriptObject;
 import com.google.gwt.core.ext.TreeLogger;
-import com.google.gwt.core.ext.UnableToCompleteException;
 import com.google.gwt.core.ext.typeinfo.JClassType;
 import com.google.gwt.core.ext.typeinfo.JType;
 import com.google.gwt.core.ext.typeinfo.NotFoundException;
@@ -77,12 +77,13 @@ public class JacksonTypeOracle {
         this.jsoType = typeOracle.findType( JavaScriptObject.class.getCanonicalName() );
     }
 
-    public JClassType getType( String type ) throws UnableToCompleteException {
+    public JClassType getType( String type ) {
         try {
             return typeOracle.getType( type );
         } catch ( NotFoundException e ) {
-            logger.log( TreeLogger.ERROR, "TypeOracle could not find " + type );
-            throw new UnableToCompleteException();
+            String message = "TypeOracle could not find " + type;
+            logger.log( TreeLogger.ERROR, message );
+            throw new UnexpectedErrorException( message );
         }
     }
 

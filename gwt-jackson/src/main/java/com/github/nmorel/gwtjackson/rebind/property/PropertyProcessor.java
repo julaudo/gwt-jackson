@@ -47,9 +47,9 @@ import com.github.nmorel.gwtjackson.rebind.JacksonTypeOracle;
 import com.github.nmorel.gwtjackson.rebind.RebindConfiguration;
 import com.github.nmorel.gwtjackson.rebind.bean.BeanInfo;
 import com.github.nmorel.gwtjackson.rebind.bean.BeanProcessor;
+import com.github.nmorel.gwtjackson.rebind.exception.UnexpectedErrorException;
 import com.google.gwt.core.ext.TreeLogger;
 import com.google.gwt.core.ext.TreeLogger.Type;
-import com.google.gwt.core.ext.UnableToCompleteException;
 import com.google.gwt.core.ext.typeinfo.JArrayType;
 import com.google.gwt.core.ext.typeinfo.JClassType;
 import com.google.gwt.core.ext.typeinfo.JField;
@@ -74,7 +74,7 @@ public final class PropertyProcessor {
                     JsonAnyGetter.class );
 
     public static PropertiesContainer findAllProperties( RebindConfiguration configuration, TreeLogger logger, JacksonTypeOracle
-            typeOracle, BeanInfo beanInfo, boolean mapperInSamePackageAsType ) throws UnableToCompleteException {
+            typeOracle, BeanInfo beanInfo, boolean mapperInSamePackageAsType ) {
 
         // we first parse the bean to retrieve all the properties
         ImmutableMap<String, PropertyAccessors> fieldsMap = PropertyParser.findPropertyAccessors( configuration, logger, beanInfo );
@@ -178,7 +178,7 @@ public final class PropertyProcessor {
     }
 
     private static Optional<PropertyInfo> processProperty( RebindConfiguration configuration, TreeLogger logger, JacksonTypeOracle
-            typeOracle, PropertyAccessors propertyAccessors, BeanInfo beanInfo, boolean samePackage ) throws UnableToCompleteException {
+            typeOracle, PropertyAccessors propertyAccessors, BeanInfo beanInfo, boolean samePackage ) {
 
         boolean getterAutoDetected = isGetterAutoDetected( propertyAccessors, beanInfo );
         boolean setterAutoDetected = isSetterAutoDetected( propertyAccessors, beanInfo );
@@ -353,7 +353,7 @@ public final class PropertyProcessor {
         }
     }
 
-    private static JType findType( TreeLogger logger, PropertyAccessors fieldAccessors ) throws UnableToCompleteException {
+    private static JType findType( TreeLogger logger, PropertyAccessors fieldAccessors ) {
         if ( fieldAccessors.getGetter().isPresent() ) {
             return fieldAccessors.getGetter().get().getReturnType();
         } else if ( fieldAccessors.getSetter().isPresent() ) {
@@ -363,8 +363,9 @@ public final class PropertyProcessor {
         } else if ( fieldAccessors.getParameter().isPresent() ) {
             return fieldAccessors.getParameter().get().getType();
         } else {
-            logger.log( Type.ERROR, "Cannot find the type of the property " + fieldAccessors.getPropertyName() );
-            throw new UnableToCompleteException();
+            String message = "Cannot find the type of the property " + fieldAccessors.getPropertyName();
+            logger.log( Type.ERROR, message );
+            throw new UnexpectedErrorException( message );
         }
     }
 
@@ -413,7 +414,7 @@ public final class PropertyProcessor {
     }
 
     private static void processBeanAnnotation( TreeLogger logger, JacksonTypeOracle typeOracle, RebindConfiguration configuration, JType
-            type, PropertyAccessors propertyAccessors, PropertyInfoBuilder builder ) throws UnableToCompleteException {
+            type, PropertyAccessors propertyAccessors, PropertyInfoBuilder builder ) {
 
         // identity
         Optional<JsonIdentityInfo> jsonIdentityInfo = propertyAccessors.getAnnotation( JsonIdentityInfo.class );

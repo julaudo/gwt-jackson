@@ -47,9 +47,9 @@ import com.github.nmorel.gwtjackson.rebind.BeanJsonDeserializerCreator;
 import com.github.nmorel.gwtjackson.rebind.CreatorUtils;
 import com.github.nmorel.gwtjackson.rebind.JacksonTypeOracle;
 import com.github.nmorel.gwtjackson.rebind.RebindConfiguration;
+import com.github.nmorel.gwtjackson.rebind.exception.UnexpectedErrorException;
 import com.github.nmorel.gwtjackson.rebind.property.PropertiesContainer;
 import com.google.gwt.core.ext.TreeLogger;
-import com.google.gwt.core.ext.UnableToCompleteException;
 import com.google.gwt.core.ext.typeinfo.JAbstractMethod;
 import com.google.gwt.core.ext.typeinfo.JClassType;
 import com.google.gwt.core.ext.typeinfo.JConstructor;
@@ -72,7 +72,7 @@ import static com.github.nmorel.gwtjackson.rebind.CreatorUtils.isObjectOrSeriali
 public final class BeanProcessor {
 
     public static BeanInfo processBean( TreeLogger logger, JacksonTypeOracle typeOracle, RebindConfiguration configuration, JClassType
-            beanType ) throws UnableToCompleteException {
+            beanType ) {
         BeanInfoBuilder builder = new BeanInfoBuilder();
         builder.setType( beanType );
 
@@ -262,14 +262,14 @@ public final class BeanProcessor {
     }
 
     private static Optional<BeanIdentityInfo> processIdentity( TreeLogger logger, JacksonTypeOracle typeOracle, RebindConfiguration
-            configuration, JClassType type ) throws UnableToCompleteException {
+            configuration, JClassType type ) {
         return processIdentity( logger, typeOracle, configuration, type, Optional.<JsonIdentityInfo>absent(), Optional
                 .<JsonIdentityReference>absent() );
     }
 
     public static Optional<BeanIdentityInfo> processIdentity( TreeLogger logger, JacksonTypeOracle typeOracle, RebindConfiguration
             configuration, JClassType type, Optional<JsonIdentityInfo> jsonIdentityInfo, Optional<JsonIdentityReference>
-                                                                      jsonIdentityReference ) throws UnableToCompleteException {
+                                                                      jsonIdentityReference ) {
 
         if ( !jsonIdentityInfo.isPresent() ) {
             jsonIdentityInfo = findFirstEncounteredAnnotationsOnAllHierarchy( configuration, type, JsonIdentityInfo.class );
@@ -315,13 +315,13 @@ public final class BeanProcessor {
     }
 
     private static Optional<BeanTypeInfo> processType( TreeLogger logger, JacksonTypeOracle typeOracle, RebindConfiguration
-            configuration, JClassType type ) throws UnableToCompleteException {
+            configuration, JClassType type ) {
         return processType( logger, typeOracle, configuration, type, Optional.<JsonTypeInfo>absent(), Optional.<JsonSubTypes>absent() );
     }
 
     public static Optional<BeanTypeInfo> processType( TreeLogger logger, JacksonTypeOracle typeOracle, RebindConfiguration configuration,
                                                       JClassType type, Optional<JsonTypeInfo> jsonTypeInfo, Optional<JsonSubTypes>
-            propertySubTypes ) throws UnableToCompleteException {
+            propertySubTypes ) {
 
         if ( !jsonTypeInfo.isPresent() ) {
             jsonTypeInfo = findFirstEncounteredAnnotationsOnAllHierarchy( configuration, type, JsonTypeInfo.class );
@@ -351,8 +351,7 @@ public final class BeanProcessor {
 
     private static ImmutableMap<JClassType, String> extractMetadata( TreeLogger logger, RebindConfiguration configuration, JClassType
             type, Optional<JsonTypeInfo> jsonTypeInfo, Optional<JsonSubTypes> propertySubTypes, Optional<JsonSubTypes> typeSubTypes,
-                                                                     ImmutableList<JClassType> allSubtypes ) throws
-            UnableToCompleteException {
+                                                                     ImmutableList<JClassType> allSubtypes ) {
 
         ImmutableMap.Builder<JClassType, String> classToMetadata = ImmutableMap.builder();
 
@@ -368,7 +367,7 @@ public final class BeanProcessor {
 
     private static String extractTypeMetadata( TreeLogger logger, RebindConfiguration configuration, JClassType baseType, JClassType
             subtype, JsonTypeInfo typeInfo, Optional<JsonSubTypes> propertySubTypes, Optional<JsonSubTypes> baseSubTypes,
-                                               ImmutableList<JClassType> allSubtypes ) throws UnableToCompleteException {
+                                               ImmutableList<JClassType> allSubtypes ) {
         switch ( typeInfo.use() ) {
             case NAME:
                 // we first look the name on JsonSubTypes annotations. Top ones override the bottom ones.
@@ -401,8 +400,9 @@ public final class BeanProcessor {
             case CLASS:
                 return subtype.getQualifiedBinaryName();
             default:
-                logger.log( TreeLogger.Type.ERROR, "JsonTypeInfo.Id." + typeInfo.use() + " is not supported" );
-                throw new UnableToCompleteException();
+                String message = "JsonTypeInfo.Id." + typeInfo.use() + " is not supported";
+                logger.log( TreeLogger.Type.ERROR, message );
+                throw new UnexpectedErrorException( message );
         }
     }
 

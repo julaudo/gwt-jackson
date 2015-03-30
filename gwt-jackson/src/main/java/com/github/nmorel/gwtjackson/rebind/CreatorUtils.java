@@ -46,11 +46,11 @@ public final class CreatorUtils {
      *
      * @return the annotation if found, null otherwise
      */
-    public static <T extends Annotation> Optional<T> findFirstEncounteredAnnotationsOnAllHierarchy( RebindConfiguration configuration,
+    public static <T extends Annotation> Optional<T> findFirstEncounteredAnnotationsOnAllHierarchy( GwtContext context,
                                                                                                     JClassType type, Class<T> annotation ) {
         JClassType currentType = type;
         while ( null != currentType ) {
-            Optional<JClassType> mixin = configuration.getMixInAnnotations( currentType );
+            Optional<JClassType> mixin = context.getMixInAnnotations( currentType );
             if ( mixin.isPresent() && mixin.get().isAnnotationPresent( annotation ) ) {
                 return Optional.of( mixin.get().getAnnotation( annotation ) );
             }
@@ -58,7 +58,7 @@ public final class CreatorUtils {
                 return Optional.of( currentType.getAnnotation( annotation ) );
             }
             for ( JClassType interf : currentType.getImplementedInterfaces() ) {
-                Optional<T> annot = findFirstEncounteredAnnotationsOnAllHierarchy( configuration, interf, annotation );
+                Optional<T> annot = findFirstEncounteredAnnotationsOnAllHierarchy( context, interf, annotation );
                 if ( annot.isPresent() ) {
                     return annot;
                 }
